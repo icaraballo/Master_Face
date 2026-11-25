@@ -1,9 +1,9 @@
-# Face Master
+# Master Face
 
 Juego web diario de deducción facial: observa un retrato generado proceduralmente y descubre de qué **dos progenitores** ha heredado sus rasgos.
 
 ## Jugar online
-👉 https://icaraballo.github.io/Face_Master/
+👉 https://icaraballo.github.io/Master_Face/
 
 ## Características del prototipo (v0.1)
 - **Reto del Día (5 rondas):** semilla diaria consistente por fecha y dificultad progresiva (4 → 6 → 8 candidatos).

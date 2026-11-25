@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Master — Prototipo Jugable</title>
+  <title>Master Face — Prototipo Jugable</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
@@ -58,7 +58,7 @@
   <header class="w-full border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-20">
     <div class="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
       <button id="btn-home" class="flex items-center gap-2 text-left group focus:outline-none">
-        <span class="font-serif text-xl font-bold tracking-tight">FACE MASTER</span>
+        <span class="font-serif text-xl font-bold tracking-tight">MASTER FACE</span>
         <span class="text-xs px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] font-mono">PROTO</span>
       </button>
       <div class="flex items-center gap-1.5">
@@ -811,7 +811,7 @@
     // =========================================================================
     // 5. GAME STATE & PERSISTENCE
     // =========================================================================
-    const STORAGE_KEY = 'face_master_v1';
+    const STORAGE_KEY = 'master_face_v1';
 
     function loadStats() {
       try {
@@ -903,7 +903,7 @@
     // =========================================================================
     function startDailyGame() {
       const today = getTodayKey();
-      const rng = mulberry32(hashString('FACE_MASTER-' + today));
+      const rng = mulberry32(hashString('MASTER_FACE-' + today));
       const schedule = ['easy', 'easy', 'medium', 'medium', 'hard'];
       const rounds = schedule.map(diff => generateRound(diff, rng));
 
@@ -1306,7 +1306,7 @@
       const dayNum = getDayNumber();
       const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
       const emojiStr = game.dailyResults.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join('');
-      const text = `Face Master #${dayNum} — ${wonCount}/5 (${game.dailyPoints} pts)\n${emojiStr}`;
+      const text = `Master Face #${dayNum} — ${wonCount}/5 (${game.dailyPoints} pts)\n${emojiStr}`;
       try {
         await navigator.clipboard.writeText(text);
         document.getElementById('share-toast').classList.remove('hidden');
