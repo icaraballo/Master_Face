@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Master — Prototipo Jugable</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: #F7F4EE;
+      --card: #FFFFFF;
+      --border: #E5DFD3;
+      --foreground: #1C1917;
+      --muted-foreground: #6B655D;
+      --primary: #1C1917;
+      --primary-foreground: #FAF8F5;
+      --secondary: #EFEAE0;
+      --secondary-foreground: #2C2825;
+      --accent: #F2EDE4;
+      --success: #2D7A4F;
+      --warning: #C58B1B;
+      --error: #C44536;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .portrait-card {
+      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, opacity 180ms ease;
+    }
+    .portrait-card:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+    .portrait-card:active:not(:disabled) {
+      transform: translateY(0px) scale(0.99);
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.94) translateY(6px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-pop {
+      animation: popIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); }
+      40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(3px); }
+    }
+    .animate-shake {
+      animation: shake 320ms ease;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="w-full border-b border-[var(--border)] bg-[var(--card)] sticky top-0 z-20">
+    <div class="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+      <button id="btn-home" class="flex items-center gap-2 text-left group focus:outline-none">
+        <span class="font-serif text-xl font-bold tracking-tight">FACE MASTER</span>
+        <span class="text-xs px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] font-mono">PROTO</span>
+      </button>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-stats" title="Estadísticas" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] hover:bg-[var(--accent)] transition flex items-center gap-1.5">
+          <span>Estadísticas</span>
+        </button>
+        <button id="btn-help" title="Cómo jugar" class="w-8 h-8 rounded-lg text-xs font-bold border border-[var(--border)] hover:bg-[var(--accent)] transition flex items-center justify-center">
+          ?
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 w-full max-w-3xl mx-auto px-4 py-6">
+
+    <!-- ==================== MENU VIEW ==================== -->
+    <section id="view-menu" class="animate-pop space-y-6">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 sm:p-8 text-center space-y-6">
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-widest text-[var(--muted-foreground)] font-medium">Juego diario de deducción facial</p>
+          <h1 class="font-serif text-3xl sm:text-4xl font-bold tracking-tight">¿De quién ha salido?</h1>
+          <p class="text-sm text-[var(--muted-foreground)] max-w-md mx-auto">
+            Observa el retrato y descubre de qué <strong>dos personas</strong> ha heredado sus rasgos. Cualquier pareja es posible.
+          </p>
+        </div>
+
+        <!-- Live DNA Preview Demo -->
+        <div class="max-w-md mx-auto pt-2">
+          <div class="flex items-center justify-center gap-2 sm:gap-3">
+            <div class="flex flex-col items-center gap-1">
+              <div id="demo-p1" class="w-20 h-24 sm:w-24 sm:h-28 rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden"></div>
+              <span class="text-xs text-[var(--muted-foreground)]">Persona A</span>
+            </div>
+            <span class="text-lg font-serif text-[var(--muted-foreground)]">+</span>
+            <div class="flex flex-col items-center gap-1">
+              <div id="demo-p2" class="w-20 h-24 sm:w-24 sm:h-28 rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden"></div>
+              <span class="text-xs text-[var(--muted-foreground)]">Persona B</span>
+            </div>
+            <span class="text-lg font-serif text-[var(--muted-foreground)]">=</span>
+            <div class="flex flex-col items-center gap-1">
+              <div id="demo-child" class="w-24 h-28 sm:w-28 sm:h-32 rounded-xl border-2 border-[var(--primary)] bg-[var(--background)] overflow-hidden shadow-sm"></div>
+              <span class="text-xs font-medium">Resultado</span>
+            </div>
+          </div>
+          <button id="btn-demo-refresh" class="mt-3 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] underline underline-offset-4 transition">
+            Generar otra mezcla de ejemplo
+          </button>
+        </div>
+
+        <!-- Primary Actions -->
+        <div class="max-w-sm mx-auto space-y-3 pt-2">
+          <button id="btn-play-daily" class="w-full py-3.5 px-5 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] font-medium text-sm hover:opacity-90 transition flex items-center justify-between">
+            <span>Reto del Día</span>
+            <span id="daily-badge" class="text-xs px-2 py-0.5 rounded-md bg-black/15 font-mono">5 rondas</span>
+          </button>
+
+          <div class="grid grid-cols-3 gap-2">
+            <button data-diff="easy" class="btn-play-endless py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--accent)] transition text-xs font-medium flex flex-col items-center gap-0.5">
+              <span>Práctica Fácil</span>
+              <span class="text-[var(--muted-foreground)] font-normal">4 caras</span>
+            </button>
+            <button data-diff="medium" class="btn-play-endless py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--accent)] transition text-xs font-medium flex flex-col items-center gap-0.5">
+              <span>Práctica Media</span>
+              <span class="text-[var(--muted-foreground)] font-normal">6 caras</span>
+            </button>
+            <button data-diff="hard" class="btn-play-endless py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--accent)] transition text-xs font-medium flex flex-col items-center gap-0.5">
+              <span>Práctica Difícil</span>
+              <span class="text-[var(--muted-foreground)] font-normal">8 caras</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini footer note -->
+      <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[var(--muted-foreground)]">
+        <span id="menu-date-label"></span>
+        <span>•</span>
+        <span id="menu-streak-label">Racha actual: 0 días</span>
+      </div>
+    </section>
+
+    <!-- ==================== GAME VIEW ==================== -->
+    <section id="view-game" class="hidden space-y-5">
+      <!-- Status Bar -->
+      <div class="flex items-center justify-between gap-3 bg-[var(--card)] border border-[var(--border)] rounded-xl px-4 py-2.5">
+        <div class="flex items-center gap-2.5">
+          <span id="game-mode-label" class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--secondary)] text-[var(--secondary-foreground)]">Reto Diario</span>
+          <span id="game-round-label" class="text-sm font-medium font-mono">Ronda 1 / 5</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <div id="game-lives" class="flex items-center gap-1" aria-label="Intentos restantes"></div>
+          <button id="btn-hint" class="text-xs px-2.5 py-1 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+            Pista
+          </button>
+        </div>
+      </div>
+
+      <!-- Target Child Card -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-5">
+        <div class="relative shrink-0">
+          <div id="target-portrait" class="w-36 h-40 sm:w-40 sm:h-44 rounded-2xl border-2 border-[var(--border)] bg-[var(--background)] overflow-hidden shadow-sm"></div>
+          <span class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--card)] border border-[var(--border)] whitespace-nowrap shadow-sm">
+            Objetivo
+          </span>
+        </div>
+
+        <div class="flex-1 text-center sm:text-left space-y-2.5">
+          <h2 class="font-serif text-xl sm:text-2xl font-bold leading-snug">¿Quiénes son sus dos progenitores?</h2>
+          <p id="game-instruction" class="text-xs sm:text-sm text-[var(--muted-foreground)]">
+            Selecciona <strong>2 retratos</strong> de abajo fijándote en ojos, cejas, nariz, boca, pelo, tono de piel y rasgos especiales.
+          </p>
+
+          <!-- Feedback / Hint Banner -->
+          <div id="feedback-banner" class="hidden rounded-xl px-3.5 py-2.5 text-xs sm:text-sm border"></div>
+        </div>
+      </div>
+
+      <!-- Candidate Grid -->
+      <div id="candidates-grid" class="grid gap-3"></div>
+
+      <!-- Action Footer -->
+      <div id="action-bar" class="sticky bottom-3 z-10 flex items-center justify-between gap-3 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-3 shadow-lg">
+        <div class="text-xs sm:text-sm text-[var(--muted-foreground)] pl-1">
+          Seleccionados: <strong id="selection-count" class="text-[var(--foreground)] font-mono">0 / 2</strong>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-clear" class="px-3 py-2 rounded-xl border border-[var(--border)] text-xs font-medium hover:bg-[var(--accent)] transition hidden">
+            Limpiar
+          </button>
+          <button id="btn-submit" disabled class="px-5 py-2.5 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition">
+            Comprobar pareja
+          </button>
+        </div>
+      </div>
+
+      <!-- Round Reveal Breakdown -->
+      <div id="reveal-panel" class="hidden animate-pop bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 space-y-4">
+        <div class="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+          <div>
+            <p id="reveal-status" class="text-xs font-semibold uppercase tracking-wider"></p>
+            <h3 class="font-serif text-lg font-bold">Desglose de herencia</h3>
+          </div>
+          <button id="btn-next-round" class="px-4 py-2 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-medium hover:opacity-90 transition">
+            Siguiente ronda →
+          </button>
+        </div>
+        <div id="reveal-breakdown" class="grid sm:grid-cols-2 gap-3"></div>
+      </div>
+    </section>
+
+    <!-- ==================== SUMMARY VIEW ==================== -->
+    <section id="view-summary" class="hidden animate-pop">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 sm:p-8 text-center space-y-6 max-w-lg mx-auto">
+        <div class="space-y-1">
+          <p class="text-xs uppercase tracking-widest text-[var(--muted-foreground)]">Reto Diario Completado</p>
+          <h2 id="summary-title" class="font-serif text-3xl font-bold">¡Buen ojo!</h2>
+        </div>
+
+        <div id="summary-emojis" class="text-2xl tracking-widest py-3 px-4 rounded-xl bg-[var(--background)] border border-[var(--border)] font-mono"></div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+            <div id="sum-score" class="text-2xl font-bold font-mono">0/5</div>
+            <div class="text-xs text-[var(--muted-foreground)]">Acertadas</div>
+          </div>
+          <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+            <div id="sum-points" class="text-2xl font-bold font-mono">0</div>
+            <div class="text-xs text-[var(--muted-foreground)]">Puntos</div>
+          </div>
+          <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+            <div id="sum-streak" class="text-2xl font-bold font-mono">1</div>
+            <div class="text-xs text-[var(--muted-foreground)]">Racha</div>
+          </div>
+        </div>
+
+        <div class="space-y-2.5 pt-2">
+          <button id="btn-share" class="w-full py-3 px-4 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-medium hover:opacity-90 transition">
+            Copiar resultado para compartir
+          </button>
+          <p id="share-toast" class="text-xs text-[var(--success)] hidden">¡Resultado copiado al portapapeles!</p>
+          <button id="btn-summary-menu" class="w-full py-2.5 px-4 rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)] transition">
+            Volver al menú
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+  <div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden items-center justify-center p-4">
+    <!-- Help Modal -->
+    <div id="modal-help" class="hidden bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl animate-pop">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <h3 class="font-serif text-xl font-bold">Cómo jugar</h3>
+        <button class="modal-close text-sm px-2 py-1 rounded-lg hover:bg-[var(--accent)]">✕</button>
+      </div>
+      <div class="space-y-3 text-sm text-[var(--muted-foreground)] leading-relaxed">
+        <p>En cada ronda verás un <strong class="text-[var(--foreground)]">retrato objetivo</strong> arriba y varios candidatos abajo.</p>
+        <p>Tu objetivo es encontrar a las <strong class="text-[var(--foreground)]">2 personas</strong> de las que ha salido. Pueden ser de cualquier género.</p>
+        <ul class="list-disc pl-5 space-y-1.5">
+          <li>El rostro hereda rasgos de ambos: <strong class="text-[var(--foreground)]">forma de cara, ojos, cejas, nariz, boca, pelo</strong> y rasgos especiales (<strong class="text-[var(--foreground)]">pecas, lunares, hoyuelos, barbilla</strong>).</li>
+          <li>El <strong class="text-[var(--foreground)]">tono de piel</strong> es una mezcla entre ambos progenitores.</li>
+          <li>La ropa es aleatoria y <em>no</em> se hereda.</li>
+          <li>Tienes <strong class="text-[var(--foreground)]">3 intentos</strong>. Si aciertas 1 de los 2, queda fijado en verde y el otro se descarta.</li>
+        </ul>
+      </div>
+      <button class="modal-close w-full py-2.5 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-medium">¡Entendido!</button>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="modal-stats" class="hidden bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl animate-pop">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+        <h3 class="font-serif text-xl font-bold">Tus estadísticas</h3>
+        <button class="modal-close text-sm px-2 py-1 rounded-lg hover:bg-[var(--accent)]">✕</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-center">
+        <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div id="st-played" class="text-2xl font-bold font-mono">0</div>
+          <div class="text-xs text-[var(--muted-foreground)]">Rondas jugadas</div>
+        </div>
+        <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div id="st-winrate" class="text-2xl font-bold font-mono">0%</div>
+          <div class="text-xs text-[var(--muted-foreground)]">% acierto</div>
+        </div>
+        <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div id="st-streak" class="text-2xl font-bold font-mono">0</div>
+          <div class="text-xs text-[var(--muted-foreground)]">Racha diaria</div>
+        </div>
+        <div class="p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div id="st-best" class="text-2xl font-bold font-mono">0</div>
+          <div class="text-xs text-[var(--muted-foreground)]">Mejor racha infinita</div>
+        </div>
+      </div>
+      <button class="modal-close w-full py-2.5 rounded-xl border border-[var(--border)] text-sm font-medium hover:bg-[var(--accent)]">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. SEEDED PRNG (for consistent Daily Challenge)
+    // =========================================================================
+    function mulberry32(seed) {
+      return function() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function hashString(str) {
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function getTodayKey() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getDayNumber() {
+      const epoch = new Date(2026, 0, 1);
+      const now = new Date();
+      const diff = Math.floor((now - epoch) / (1000 * 60 * 60 * 24));
+      return Math.max(1, diff + 1);
+    }
+
+    // =========================================================================
+    // 2. GENETIC TRAIT DEFINITIONS & PALETTES
+    // =========================================================================
+    const SKINS = [
+      { id: 0, base: '#FCE2D2', shade: '#E8BFA7' },
+      { id: 1, base: '#F1C7A8', shade: '#D6A37E' },
+      { id: 2, base: '#DDA77B', shade: '#BD8356' },
+      { id: 3, base: '#BD8154', shade: '#996037' },
+      { id: 4, base: '#8F5934', shade: '#6E3E1F' },
+      { id: 5, base: '#5E3924', shade: '#402414' }
+    ];
+
+    const HAIR_COLORS = [
+      { id: 'black',     hex: '#1E1D21', label: 'Pelo negro' },
+      { id: 'darkBrown', hex: '#4A3123', label: 'Pelo castaño oscuro' },
+      { id: 'chestnut',  hex: '#825032', label: 'Pelo castaño claro' },
+      { id: 'auburn',    hex: '#A84227', label: 'Pelo pelirrojo' },
+      { id: 'blonde',    hex: '#D9AE5B', label: 'Pelo rubio' },
+      { id: 'silver',    hex: '#B4B7BE', label: 'Pelo plateado' }
+    ];
+
+    const EYE_COLORS = [
+      { id: 'dark',  hex: '#2B1F19', label: 'Ojos oscuros' },
+      { id: 'hazel', hex: '#7C582B', label: 'Ojos avellana' },
+      { id: 'green', hex: '#3B7A57', label: 'Ojos verdes' },
+      { id: 'blue',  hex: '#3A6EA5', label: 'Ojos azules' },
+      { id: 'gray',  hex: '#6B7B8C', label: 'Ojos grises' }
+    ];
+
+    const FACE_SHAPES = ['oval', 'round', 'square', 'heart'];
+    const EYE_SHAPES  = ['almond', 'round', 'hooded', 'upturned'];
+    const EYEBROWS    = ['thick', 'arched', 'straight', 'soft'];
+    const NOSES       = ['button', 'straight', 'wide', 'aquiline'];
+    const MOUTHS      = ['smile', 'full', 'thin', 'serene'];
+    const HAIR_STYLES = ['shortCrop', 'curlyAfro', 'bob', 'longWavy', 'bun', 'buzz', 'sidePart', 'shaggy'];
+    const MARKS       = ['none', 'freckles', 'beautyMark', 'dimples', 'cleftChin', 'rosyCheeks'];
+
+    const SHIRT_COLORS = [
+      '#5B7065', '#6C7A89', '#8E6C88', '#A66E5E',
+      '#4F6D7A', '#7A8B68', '#9A7B56', '#5F637A'
+    ];
+
+    const NAMES = [
+      'Alex', 'Nora', 'Mateo', 'Sofía', 'Kai', 'Elena',
+      'Hugo', 'Clara', 'Leo', 'Maya', 'Omar', 'Vera',
+      'Dani', 'Iris', 'Bruno', 'Alba', 'Gael', 'Noa',
+      'Sami', 'Lola', 'Teo', 'Inés', 'Río', 'Zoe'
+    ];
+
+    const TRAIT_LABELS = {
+      faceShape: 'Forma de rostro',
+      eyes:      'Ojos',
+      eyebrows:  'Cejas',
+      nose:      'Nariz',
+      mouth:     'Boca',
+      hair:      'Pelo',
+      mark:      'Rasgo especial'
+    };
+
+    const MARK_NAMES = {
+      freckles:   'Pecas',
+      beautyMark: 'Lunar',
+      dimples:    'Hoyuelos',
+      cleftChin:  'Barbilla partida',
+      rosyCheeks: 'Mejillas sonrosadas'
+    };
+
+    // Helper: pick random element with RNG
+    const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
+
+    function shuffle(arr, rng) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function blendHex(hexA, hexB, t = 0.5) {
+      const a = hexToRgb(hexA);
+      const b = hexToRgb(hexB);
+      const r = Math.round(a[0] + (b[0] - a[0]) * t);
+      const g = Math.round(a[1] + (b[1] - a[1]) * t);
+      const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+      return '#' + [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    // =========================================================================
+    // 3. DNA GENERATION & INHERITANCE ENGINE
+    // =========================================================================
+    function createRandomDNA(rng) {
+      const skinObj = pick(SKINS, rng);
+      const markRoll = rng();
+      const mark = markRoll < 0.35 ? 'none' : pick(MARKS.slice(1), rng);
+      return {
+        skinBase: skinObj.base,
+        skinShade: skinObj.shade,
+        skinId: skinObj.id,
+        faceShape: pick(FACE_SHAPES, rng),
+        eyeShape: pick(EYE_SHAPES, rng),
+        eyeColor: pick(EYE_COLORS, rng).id,
+        eyebrows: pick(EYEBROWS, rng),
+        nose: pick(NOSES, rng),
+        mouth: pick(MOUTHS, rng),
+        hairStyle: pick(HAIR_STYLES, rng),
+        hairColor: pick(HAIR_COLORS, rng).id,
+        mark,
+        shirtColor: pick(SHIRT_COLORS, rng)
+      };
+    }
+
+    function countCoreDifferences(a, b) {
+      let diff = 0;
+      if (a.faceShape !== b.faceShape) diff++;
+      if (a.eyeShape !== b.eyeShape || a.eyeColor !== b.eyeColor) diff++;
+      if (a.eyebrows !== b.eyebrows) diff++;
+      if (a.nose !== b.nose) diff++;
+      if (a.mouth !== b.mouth) diff++;
+      if (a.hairStyle !== b.hairStyle || a.hairColor !== b.hairColor) diff++;
+      if (Math.abs(a.skinId - b.skinId) >= 1) diff++;
+      return diff;
+    }
+
+    function generateChild(parentA, parentB, rng) {
+      // Split the 6 core visual trait groups cleanly: 3 from A, 3 from B
+      const coreGroups = shuffle(['faceShape', 'eyes', 'eyebrows', 'nose', 'mouth', 'hair'], rng);
+      const fromA = new Set(coreGroups.slice(0, 3));
+      const fromB = new Set(coreGroups.slice(3, 6));
+
+      const inheritedFromA = [];
+      const inheritedFromB = [];
+
+      const choose = (group) => {
+        if (fromA.has(group)) {
+          inheritedFromA.push(TRAIT_LABELS[group]);
+          return parentA;
+        } else {
+          inheritedFromB.push(TRAIT_LABELS[group]);
+          return parentB;
+        }
+      };
+
+      const faceSrc = choose('faceShape');
+      const eyeSrc  = choose('eyes');
+      const browSrc = choose('eyebrows');
+      const noseSrc = choose('nose');
+      const mouthSrc = choose('mouth');
+      const hairSrc = choose('hair');
+
+      // Blend skin tone smoothly between A and B
+      const t = 0.4 + rng() * 0.2;
+      const skinBase = blendHex(parentA.skinBase, parentB.skinBase, t);
+      const skinShade = blendHex(parentA.skinShade, parentB.skinShade, t);
+      const skinId = (parentA.skinId + parentB.skinId) / 2;
+
+      // Special mark inheritance
+      let mark = 'none';
+      if (parentA.mark !== 'none' && parentB.mark !== 'none') {
+        if (rng() < 0.5) {
+          mark = parentA.mark;
+          inheritedFromA.push(MARK_NAMES[mark]);
+        } else {
+          mark = parentB.mark;
+          inheritedFromB.push(MARK_NAMES[mark]);
+        }
+      } else if (parentA.mark !== 'none' && rng() < 0.75) {
+        mark = parentA.mark;
+        inheritedFromA.push(MARK_NAMES[mark]);
+      } else if (parentB.mark !== 'none' && rng() < 0.75) {
+        mark = parentB.mark;
+        inheritedFromB.push(MARK_NAMES[mark]);
+      }
+
+      const dna = {
+        skinBase,
+        skinShade,
+        skinId,
+        faceShape: faceSrc.faceShape,
+        eyeShape: eyeSrc.eyeShape,
+        eyeColor: eyeSrc.eyeColor,
+        eyebrows: browSrc.eyebrows,
+        nose: noseSrc.nose,
+        mouth: mouthSrc.mouth,
+        hairStyle: hairSrc.hairStyle,
+        hairColor: hairSrc.hairColor,
+        mark,
+        shirtColor: pick(SHIRT_COLORS, rng)
+      };
+
+      return { dna, inheritedFromA, inheritedFromB };
+    }
+
+    function similarityToChild(candidate, child) {
+      let score = 0;
+      if (candidate.faceShape === child.faceShape) score += 1;
+      if (candidate.eyeShape === child.eyeShape && candidate.eyeColor === child.eyeColor) score += 1.4;
+      if (candidate.eyebrows === child.eyebrows) score += 0.8;
+      if (candidate.nose === child.nose) score += 1;
+      if (candidate.mouth === child.mouth) score += 1;
+      if (candidate.hairStyle === child.hairStyle && candidate.hairColor === child.hairColor) score += 1.4;
+      if (child.mark !== 'none' && candidate.mark === child.mark) score += 1;
+      return score;
+    }
+
+    function generateRound(difficulty, rng) {
+      const countMap = { easy: 4, medium: 6, hard: 8 };
+      const numCandidates = countMap[difficulty] || 6;
+
+      // Generate two distinct parents
+      const parentA = createRandomDNA(rng);
+      let parentB = createRandomDNA(rng);
+      let guard = 0;
+      while (countCoreDifferences(parentA, parentB) < 5 && guard < 40) {
+        parentB = createRandomDNA(rng);
+        guard++;
+      }
+
+      const { dna: child, inheritedFromA, inheritedFromB } = generateChild(parentA, parentB, rng);
+
+      // Generate decoys calibrated by difficulty
+      const maxDecoySim = difficulty === 'easy' ? 1.5 : difficulty === 'medium' ? 2.4 : 3.2;
+      const minDecoySim = difficulty === 'hard' ? 1.0 : 0;
+
+      const decoys = [];
+      for (let i = 0; i < numCandidates - 2; i++) {
+        let bestDecoy = null;
+        for (let tries = 0; tries < 50; tries++) {
+          const d = createRandomDNA(rng);
+          const sim = similarityToChild(d, child);
+          const tooCloseToParent =
+            countCoreDifferences(d, parentA) < 3 ||
+            countCoreDifferences(d, parentB) < 3 ||
+            decoys.some(x => countCoreDifferences(d, x) < 3);
+
+          if (!tooCloseToParent && sim >= minDecoySim && sim <= maxDecoySim) {
+            bestDecoy = d;
+            break;
+          }
+          if (!bestDecoy) bestDecoy = d;
+        }
+        decoys.push(bestDecoy);
+      }
+
+      const names = shuffle(NAMES, rng).slice(0, numCandidates);
+      const rawCandidates = [
+        { id: 'A', dna: parentA, isParent: true, traits: inheritedFromA },
+        { id: 'B', dna: parentB, isParent: true, traits: inheritedFromB },
+        ...decoys.map((d, idx) => ({ id: `D${idx}`, dna: d, isParent: false, traits: [] }))
+      ];
+
+      const shuffled = shuffle(rawCandidates, rng).map((c, idx) => ({
+        ...c,
+        index: idx,
+        name: names[idx]
+      }));
+
+      return {
+        difficulty,
+        child,
+        candidates: shuffled,
+        parentIndices: shuffled.filter(c => c.isParent).map(c => c.index)
+      };
+    }
+
+    // =========================================================================
+    // 4. EDITORIAL SVG PORTRAIT RENDERER
+    // =========================================================================
+    function renderPortraitSVG(dna) {
+      const hairHex = (HAIR_COLORS.find(h => h.id === dna.hairColor) || HAIR_COLORS[0]).hex;
+      const eyeHex  = (EYE_COLORS.find(e => e.id === dna.eyeColor) || EYE_COLORS[0]).hex;
+      const stroke  = '#231F20';
+
+      // --- Back Hair Layer ---
+      let backHair = '';
+      if (dna.hairStyle === 'longWavy') {
+        backHair = `<path d="M32,78 C24,110 26,145 36,162 L124,162 C134,145 136,110 128,78 C122,38 38,38 32,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'bob') {
+        backHair = `<path d="M33,76 C28,104 31,130 43,138 L117,138 C129,130 132,104 127,76 C122,38 38,38 33,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'curlyAfro') {
+        backHair = `
+          <g fill="${hairHex}" stroke="${stroke}" stroke-width="2.2">
+            <circle cx="80" cy="54" r="44"/>
+            <circle cx="42" cy="70" r="24"/>
+            <circle cx="118" cy="70" r="24"/>
+            <circle cx="38" cy="96" r="18"/>
+            <circle cx="122" cy="96" r="18"/>
+          </g>`;
+      } else if (dna.hairStyle === 'bun') {
+        backHair = `
+          <circle cx="80" cy="28" r="18" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>
+          <path d="M38,76 C36,42 124,42 122,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'shaggy') {
+        backHair = `<path d="M34,74 C26,98 30,126 42,134 L118,134 C130,126 134,98 126,74 C120,36 40,36 34,74 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      }
+
+      // --- Face Shape ---
+      let facePath = '';
+      if (dna.faceShape === 'oval') {
+        facePath = 'M42,84 C42,50 118,50 118,84 C118,122 102,144 80,144 C58,144 42,122 42,84 Z';
+      } else if (dna.faceShape === 'round') {
+        facePath = 'M38,90 C38,52 122,52 122,90 C122,126 106,143 80,143 C54,143 38,126 38,90 Z';
+      } else if (dna.faceShape === 'square') {
+        facePath = 'M42,84 C42,52 118,52 118,84 L117,118 C117,134 103,143 80,143 C57,143 43,134 43,118 Z';
+      } else { // heart
+        facePath = 'M40,80 C40,50 120,50 120,80 C120,108 98,140 80,145 C62,140 40,108 40,80 Z';
+      }
+
+      // --- Eyes ---
+      let eyesSvg = '';
+      const renderEye = (cx, isRight) => {
+        const dir = isRight ? 1 : -1;
+        if (dna.eyeShape === 'almond') {
+          return `
+            <path d="M${cx - 10},89 Q${cx},81 ${cx + 10},89 Q${cx},95 ${cx - 10},89 Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
+            <circle cx="${cx}" cy="89" r="4.1" fill="${eyeHex}"/>
+            <circle cx="${cx}" cy="89" r="2" fill="#111"/>
+            <circle cx="${cx + 1.5}" cy="87.5" r="1.1" fill="#FFF"/>
+          `;
+        } else if (dna.eyeShape === 'round') {
+          return `
+            <circle cx="${cx}" cy="89" r="7.2" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
+            <circle cx="${cx}" cy="89" r="4.5" fill="${eyeHex}"/>
+            <circle cx="${cx}" cy="89" r="2.2" fill="#111"/>
+            <circle cx="${cx + 1.6}" cy="87.2" r="1.2" fill="#FFF"/>
+          `;
+        } else if (dna.eyeShape === 'hooded') {
+          return `
+            <path d="M${cx - 10},89 Q${cx},84 ${cx + 10},89 Q${cx},94 ${cx - 10},89 Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
+            <circle cx="${cx}" cy="89.5" r="3.6" fill="${eyeHex}"/>
+            <circle cx="${cx}" cy="89.5" r="1.8" fill="#111"/>
+            <path d="M${cx - 11},85.5 Q${cx},82 ${cx + 11},86" fill="none" stroke="${stroke}" stroke-width="1.7" stroke-linecap="round"/>
+          `;
+        } else { // upturned
+          return `
+            <path d="M${cx - 10},${89 + dir * 1.5} Q${cx},81 ${cx + 10},${89 - dir * 1.5} Q${cx},95 ${cx - 10},${89 + dir * 1.5} Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
+            <circle cx="${cx}" cy="88.5" r="4" fill="${eyeHex}"/>
+            <circle cx="${cx}" cy="88.5" r="1.9" fill="#111"/>
+            <circle cx="${cx + 1.4}" cy="87" r="1.1" fill="#FFF"/>
+          `;
+        }
+      };
+      eyesSvg = renderEye(62, false) + renderEye(98, true);
+
+      // --- Eyebrows ---
+      let browsSvg = '';
+      if (dna.eyebrows === 'thick') {
+        browsSvg = `
+          <path d="M51,77 Q62,73 72,77" fill="none" stroke="${hairHex}" stroke-width="4.4" stroke-linecap="round"/>
+          <path d="M88,77 Q98,73 109,77" fill="none" stroke="${hairHex}" stroke-width="4.4" stroke-linecap="round"/>
+        `;
+      } else if (dna.eyebrows === 'arched') {
+        browsSvg = `
+          <path d="M51,79 Q61,70 72,77" fill="none" stroke="${hairHex}" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M88,77 Q99,70 109,79" fill="none" stroke="${hairHex}" stroke-width="2.4" stroke-linecap="round"/>
+        `;
+      } else if (dna.eyebrows === 'straight') {
+        browsSvg = `
+          <path d="M51,77 L72,77" fill="none" stroke="${hairHex}" stroke-width="3" stroke-linecap="round"/>
+          <path d="M88,77 L109,77" fill="none" stroke="${hairHex}" stroke-width="3" stroke-linecap="round"/>
+        `;
+      } else { // soft
+        browsSvg = `
+          <path d="M52,78 Q62,74 71,77" fill="none" stroke="${hairHex}" stroke-width="2" stroke-linecap="round"/>
+          <path d="M89,77 Q98,74 108,78" fill="none" stroke="${hairHex}" stroke-width="2" stroke-linecap="round"/>
+        `;
+      }
+
+      // --- Nose ---
+      let noseSvg = '';
+      if (dna.nose === 'button') {
+        noseSvg = `<path d="M76,105 Q80,109 84,105" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+      } else if (dna.nose === 'straight') {
+        noseSvg = `<path d="M80,91 L80,106 Q77,108 75,106" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+      } else if (dna.nose === 'wide') {
+        noseSvg = `
+          <path d="M72,105 Q76,109 80,108 Q84,109 88,105" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="75" cy="105.5" r="1.2" fill="${stroke}"/>
+          <circle cx="85" cy="105.5" r="1.2" fill="${stroke}"/>
+        `;
+      } else { // aquiline
+        noseSvg = `<path d="M79,89 Q84,99 81,107 Q77,109 75,106" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+      }
+
+      // --- Mouth ---
+      let mouthSvg = '';
+      if (dna.mouth === 'smile') {
+        mouthSvg = `<path d="M67,120 Q80,130 93,120" fill="none" stroke="${stroke}" stroke-width="2.3" stroke-linecap="round"/>`;
+      } else if (dna.mouth === 'full') {
+        mouthSvg = `
+          <path d="M68,121 Q74,117 80,119 Q86,117 92,121 Q80,130 68,121 Z" fill="#C97676" stroke="${stroke}" stroke-width="1.8" stroke-linejoin="round"/>
+          <path d="M70,121 Q80,123 90,121" fill="none" stroke="${stroke}" stroke-width="1.2"/>
+        `;
+      } else if (dna.mouth === 'thin') {
+        mouthSvg = `<path d="M69,122 Q80,124 91,122" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+      } else { // serene
+        mouthSvg = `<path d="M71,121 Q80,126 89,121" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round"/>`;
+      }
+
+      // --- Special Genetic Marks ---
+      let markSvg = '';
+      if (dna.mark === 'freckles') {
+        markSvg = `
+          <g fill="#7A482B" opacity="0.65">
+            <circle cx="54" cy="101" r="1.3"/><circle cx="60" cy="103" r="1.2"/><circle cx="57" cy="106" r="1.2"/><circle cx="65" cy="101" r="1.1"/>
+            <circle cx="106" cy="101" r="1.3"/><circle cx="100" cy="103" r="1.2"/><circle cx="103" cy="106" r="1.2"/><circle cx="95" cy="101" r="1.1"/>
+          </g>`;
+      } else if (dna.mark === 'beautyMark') {
+        markSvg = `<circle cx="101" cy="109" r="2.2" fill="#2B1E1A"/>`;
+      } else if (dna.mark === 'dimples') {
+        markSvg = `
+          <path d="M62,118 Q60,122 63,125" fill="none" stroke="${dna.skinShade}" stroke-width="2" stroke-linecap="round"/>
+          <path d="M98,118 Q100,122 97,125" fill="none" stroke="${dna.skinShade}" stroke-width="2" stroke-linecap="round"/>`;
+      } else if (dna.mark === 'cleftChin') {
+        markSvg = `<path d="M80,134 L80,140" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" opacity="0.65"/>`;
+      } else if (dna.mark === 'rosyCheeks') {
+        markSvg = `
+          <ellipse cx="55" cy="105" rx="8" ry="4.5" fill="#E07A7A" opacity="0.38"/>
+          <ellipse cx="105" cy="105" rx="8" ry="4.5" fill="#E07A7A" opacity="0.38"/>`;
+      }
+
+      // --- Front Hair Layer ---
+      let frontHair = '';
+      if (dna.hairStyle === 'shortCrop') {
+        frontHair = `<path d="M40,78 C38,44 122,44 120,78 C112,62 96,56 80,58 C64,56 48,62 40,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'buzz') {
+        frontHair = `<path d="M43,72 C44,48 116,48 117,72 C108,60 52,60 43,72 Z" fill="${hairHex}" opacity="0.88"/>`;
+      } else if (dna.hairStyle === 'sidePart') {
+        frontHair = `<path d="M39,80 C38,42 122,42 121,80 C114,62 100,58 64,54 C52,62 44,68 39,80 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'bob') {
+        frontHair = `<path d="M38,76 C40,42 120,42 122,76 C112,64 102,58 80,62 C58,58 48,64 38,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'longWavy') {
+        frontHair = `<path d="M38,78 C40,42 120,42 122,78 C110,58 92,54 80,64 C68,54 50,58 38,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+      } else if (dna.hairStyle === 'curlyAfro') {
+        frontHair = `
+          <g fill="${hairHex}">
+            <circle cx="56" cy="54" r="12"/>
+            <circle cx="72" cy="50" r="13"/>
+            <circle cx="90" cy="50" r="13"/>
+            <circle cx="105" cy="55" r="11"/>
+          </g>`;
+      } else if (dna.hairStyle === 'bun') {
+        frontHair = `<path d="M41,76 C44,48 116,48 119,76 C108,60 52,60 41,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>`;
+      } else if (dna.hairStyle === 'shaggy') {
+        frontHair = `<path d="M37,80 C38,42 122,42 123,80 L110,64 L98,72 L86,60 L72,71 L58,61 L48,72 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"/>`;
+      }
+
+      return `
+        <svg viewBox="0 0 160 180" class="w-full h-full block select-none" xmlns="http://www.w3.org/2000/svg">
+          ${backHair}
+          <!-- Neck & Shoulders -->
+          <path d="M24,180 C26,156 50,150 66,148 L94,148 C110,150 134,156 136,180 Z" fill="${dna.shirtColor}" stroke="${stroke}" stroke-width="2.2"/>
+          <rect x="68" y="132" width="24" height="24" rx="8" fill="${dna.skinShade}" stroke="${stroke}" stroke-width="2"/>
+          <!-- Ears -->
+          <ellipse cx="41" cy="95" rx="6" ry="10" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2"/>
+          <ellipse cx="119" cy="95" rx="6" ry="10" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2"/>
+          <!-- Head -->
+          <path d="${facePath}" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2.2"/>
+          ${markSvg}
+          ${eyesSvg}
+          ${browsSvg}
+          ${noseSvg}
+          ${mouthSvg}
+          ${frontHair}
+        </svg>
+      `;
+    }
+
+    // =========================================================================
+    // 5. GAME STATE & PERSISTENCE
+    // =========================================================================
+    const STORAGE_KEY = 'face_master_v1';
+
+    function loadStats() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return {
+        roundsPlayed: 0,
+        roundsWon: 0,
+        dailyStreak: 0,
+        lastDailyDate: null,
+        lastDailyResult: null,
+        bestEndlessStreak: 0
+      };
+    }
+
+    function saveStats(stats) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
+    }
+
+    let stats = loadStats();
+
+    let game = {
+      mode: 'daily', // 'daily' | 'endless'
+      endlessDiff: 'medium',
+      endlessStreak: 0,
+      rounds: [],
+      roundIdx: 0,
+      lives: 3,
+      selected: new Set(),
+      lockedParents: new Set(),
+      eliminated: new Set(),
+      hintUsed: false,
+      roundOver: false,
+      dailyResults: [], // array of 'perfect' | 'won' | 'lost'
+      dailyPoints: 0
+    };
+
+    // =========================================================================
+    // 6. DOM REFERENCES & NAVIGATION
+    // =========================================================================
+    const views = {
+      menu: document.getElementById('view-menu'),
+      game: document.getElementById('view-game'),
+      summary: document.getElementById('view-summary')
+    };
+
+    function showView(name) {
+      Object.entries(views).forEach(([k, el]) => {
+        el.classList.toggle('hidden', k !== name);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // =========================================================================
+    // 7. MENU DEMO & INITIALIZATION
+    // =========================================================================
+    function renderMenuDemo() {
+      const rng = Math.random;
+      const p1 = createRandomDNA(rng);
+      let p2 = createRandomDNA(rng);
+      let tries = 0;
+      while (countCoreDifferences(p1, p2) < 5 && tries < 30) {
+        p2 = createRandomDNA(rng);
+        tries++;
+      }
+      const { dna: child } = generateChild(p1, p2, rng);
+      document.getElementById('demo-p1').innerHTML = renderPortraitSVG(p1);
+      document.getElementById('demo-p2').innerHTML = renderPortraitSVG(p2);
+      document.getElementById('demo-child').innerHTML = renderPortraitSVG(child);
+    }
+
+    function updateMenuMeta() {
+      const today = getTodayKey();
+      const dayNum = getDayNumber();
+      document.getElementById('menu-date-label').textContent = `Edición #${dayNum} · ${today}`;
+      document.getElementById('menu-streak-label').textContent = `Racha diaria: ${stats.dailyStreak} ${stats.dailyStreak === 1 ? 'día' : 'días'}`;
+
+      const badge = document.getElementById('daily-badge');
+      if (stats.lastDailyDate === today && stats.lastDailyResult) {
+        badge.textContent = `Completado (${stats.lastDailyResult.won}/5)`;
+      } else {
+        badge.textContent = '5 rondas';
+      }
+    }
+
+    // =========================================================================
+    // 8. STARTING GAMES
+    // =========================================================================
+    function startDailyGame() {
+      const today = getTodayKey();
+      const rng = mulberry32(hashString('FACE_MASTER-' + today));
+      const schedule = ['easy', 'easy', 'medium', 'medium', 'hard'];
+      const rounds = schedule.map(diff => generateRound(diff, rng));
+
+      game = {
+        mode: 'daily',
+        endlessDiff: 'medium',
+        endlessStreak: 0,
+        rounds,
+        roundIdx: 0,
+        lives: 3,
+        selected: new Set(),
+        lockedParents: new Set(),
+        eliminated: new Set(),
+        hintUsed: false,
+        roundOver: false,
+        dailyResults: [],
+        dailyPoints: 0
+      };
+
+      showView('game');
+      renderCurrentRound();
+    }
+
+    function startEndlessGame(diff) {
+      game = {
+        mode: 'endless',
+        endlessDiff: diff,
+        endlessStreak: 0,
+        rounds: [generateRound(diff, Math.random)],
+        roundIdx: 0,
+        lives: 3,
+        selected: new Set(),
+        lockedParents: new Set(),
+        eliminated: new Set(),
+        hintUsed: false,
+        roundOver: false,
+        dailyResults: [],
+        dailyPoints: 0
+      };
+
+      showView('game');
+      renderCurrentRound();
+    }
+
+    // =========================================================================
+    // 9. GAMEPLAY RENDERING & LOGIC
+    // =========================================================================
+    function getCurrentRound() {
+      return game.rounds[game.roundIdx];
+    }
+
+    function renderLives() {
+      const el = document.getElementById('game-lives');
+      el.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const alive = i < game.lives;
+        const dot = document.createElement('span');
+        dot.className = `w-2.5 h-2.5 rounded-full transition ${alive ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'}`;
+        el.appendChild(dot);
+      }
+    }
+
+    function setBanner(text, type = 'neutral') {
+      const banner = document.getElementById('feedback-banner');
+      if (!text) {
+        banner.classList.add('hidden');
+        return;
+      }
+      banner.classList.remove('hidden');
+      banner.className = 'rounded-xl px-3.5 py-2.5 text-xs sm:text-sm border ';
+      if (type === 'success') {
+        banner.className += 'border-[var(--success)] text-[var(--success)] bg-[var(--background)]';
+      } else if (type === 'warning') {
+        banner.className += 'border-[var(--warning)] text-[var(--foreground)] bg-[var(--background)]';
+      } else if (type === 'error') {
+        banner.className += 'border-[var(--error)] text-[var(--error)] bg-[var(--background)]';
+      } else {
+        banner.className += 'border-[var(--border)] text-[var(--muted-foreground)] bg-[var(--background)]';
+      }
+      banner.innerHTML = text;
+    }
+
+    function renderCurrentRound() {
+      const round = getCurrentRound();
+
+      document.getElementById('game-mode-label').textContent =
+        game.mode === 'daily' ? 'Reto Diario' :
+        `Práctica · ${game.endlessDiff === 'easy' ? 'Fácil' : game.endlessDiff === 'medium' ? 'Media' : 'Difícil'}`;
+
+      document.getElementById('game-round-label').textContent =
+        game.mode === 'daily' ? `Ronda ${game.roundIdx + 1} / ${game.rounds.length}` : `Racha: ${game.endlessStreak}`;
+
+      renderLives();
+
+      const hintBtn = document.getElementById('btn-hint');
+      hintBtn.disabled = game.hintUsed || game.roundOver;
+      hintBtn.textContent = game.hintUsed ? 'Pista usada' : 'Pista';
+
+      document.getElementById('target-portrait').innerHTML = renderPortraitSVG(round.child);
+      document.getElementById('reveal-panel').classList.add('hidden');
+      document.getElementById('action-bar').classList.toggle('hidden', game.roundOver);
+      setBanner('');
+
+      renderCandidatesGrid();
+      updateActionBar();
+    }
+
+    function renderCandidatesGrid() {
+      const round = getCurrentRound();
+      const grid = document.getElementById('candidates-grid');
+      const count = round.candidates.length;
+      grid.className = count === 4
+        ? 'grid grid-cols-2 sm:grid-cols-4 gap-3'
+        : count === 6
+          ? 'grid grid-cols-2 sm:grid-cols-3 gap-3'
+          : 'grid grid-cols-2 sm:grid-cols-4 gap-3';
+
+      grid.innerHTML = '';
+
+      round.candidates.forEach((cand) => {
+        const isLocked = game.lockedParents.has(cand.index);
+        const isElim = game.eliminated.has(cand.index);
+        const isSel = game.selected.has(cand.index) || isLocked;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.disabled = game.roundOver || isElim || isLocked;
+
+        let borderClass = 'border-[var(--border)] bg-[var(--card)]';
+        if (isLocked) {
+          borderClass = 'border-2 border-[var(--success)] bg-[var(--card)]';
+        } else if (game.roundOver && cand.isParent) {
+          borderClass = 'border-2 border-[var(--success)] bg-[var(--card)]';
+        } else if (isSel) {
+          borderClass = 'border-2 border-[var(--primary)] bg-[var(--card)] shadow-md';
+        } else if (isElim) {
+          borderClass = 'border-[var(--border)] bg-[var(--background)] opacity-40';
+        }
+
+        btn.className = `portrait-card relative rounded-2xl border p-2.5 flex flex-col items-center gap-2 focus:outline-none ${borderClass}`;
+
+        let badgeHtml = '';
+        if (isLocked || (game.roundOver && cand.isParent)) {
+          badgeHtml = `<span class="absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded-md bg-[var(--success)] text-white font-semibold">✓</span>`;
+        } else if (isElim) {
+          badgeHtml = `<span class="absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded-md bg-[var(--error)] text-white font-semibold">✕</span>`;
+        } else if (isSel) {
+          badgeHtml = `<span class="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs flex items-center justify-center font-bold">●</span>`;
+        }
+
+        btn.innerHTML = `
+          ${badgeHtml}
+          <div class="w-full aspect-[8/9] max-w-[130px] rounded-xl bg-[var(--background)] overflow-hidden">
+            ${renderPortraitSVG(cand.dna)}
+          </div>
+          <span class="text-xs font-medium tracking-tight">${cand.name}</span>
+        `;
+
+        btn.addEventListener('click', () => toggleCandidate(cand.index));
+        grid.appendChild(btn);
+      });
+    }
+
+    function toggleCandidate(idx) {
+      if (game.roundOver || game.eliminated.has(idx) || game.lockedParents.has(idx)) return;
+
+      const totalActive = () => game.lockedParents.size + game.selected.size;
+
+      if (game.selected.has(idx)) {
+        game.selected.delete(idx);
+      } else {
+        if (totalActive() >= 2) {
+          // Replace the oldest non-locked selection
+          const first = game.selected.values().next().value;
+          if (first !== undefined) game.selected.delete(first);
+        }
+        game.selected.add(idx);
+      }
+      renderCandidatesGrid();
+      updateActionBar();
+    }
+
+    function updateActionBar() {
+      const count = game.lockedParents.size + game.selected.size;
+      document.getElementById('selection-count').textContent = `${count} / 2`;
+      document.getElementById('btn-submit').disabled = count !== 2 || game.roundOver;
+      document.getElementById('btn-clear').classList.toggle('hidden', game.selected.size === 0 || game.roundOver);
+    }
+
+    function submitGuess() {
+      const round = getCurrentRound();
+      const chosen = [...game.lockedParents, ...game.selected];
+      if (chosen.length !== 2) return;
+
+      const parentSet = new Set(round.parentIndices);
+      const hits = chosen.filter(i => parentSet.has(i));
+      const misses = chosen.filter(i => !parentSet.has(i));
+
+      if (hits.length === 2) {
+        // WIN ROUND
+        hits.forEach(i => game.lockedParents.add(i));
+        game.selected.clear();
+        finishRound(true);
+        return;
+      }
+
+      // Partial or full miss
+      game.lives -= 1;
+      hits.forEach(i => game.lockedParents.add(i));
+      misses.forEach(i => game.eliminated.add(i));
+      game.selected.clear();
+      renderLives();
+
+      if (game.lives <= 0) {
+        finishRound(false);
+        return;
+      }
+
+      if (hits.length === 1) {
+        const foundName = round.candidates[hits[0]].name;
+        setBanner(`<strong>¡1 de 2!</strong> ${foundName} sí es progenitor (fijado en verde). Busca a su pareja.`, 'warning');
+      } else {
+        setBanner(`<strong>0 de 2.</strong> Ninguno de los dos es progenitor. Te quedan ${game.lives} ${game.lives === 1 ? 'intento' : 'intentos'}.`, 'error');
+      }
+
+      const grid = document.getElementById('candidates-grid');
+      grid.classList.add('animate-shake');
+      setTimeout(() => grid.classList.remove('animate-shake'), 340);
+
+      renderCandidatesGrid();
+      updateActionBar();
+    }
+
+    function useHint() {
+      if (game.hintUsed || game.roundOver) return;
+      const round = getCurrentRound();
+      const parentSet = new Set(round.parentIndices);
+      const availableDecoys = round.candidates
+        .filter(c => !parentSet.has(c.index) && !game.eliminated.has(c.index))
+        .map(c => c.index);
+
+      if (availableDecoys.length === 0) return;
+      const toRemove = availableDecoys[Math.floor(Math.random() * availableDecoys.length)];
+      game.eliminated.add(toRemove);
+      game.selected.delete(toRemove);
+      game.hintUsed = true;
+
+      document.getElementById('btn-hint').disabled = true;
+      document.getElementById('btn-hint').textContent = 'Pista usada';
+      setBanner(`<strong>Pista:</strong> Hemos descartado a ${round.candidates[toRemove].name}.`, 'neutral');
+
+      renderCandidatesGrid();
+      updateActionBar();
+    }
+
+    function finishRound(won) {
+      const round = getCurrentRound();
+      game.roundOver = true;
+
+      stats.roundsPlayed += 1;
+      if (won) stats.roundsWon += 1;
+
+      if (game.mode === 'daily') {
+        const resultType = !won ? 'lost' : (game.lives === 3 && !game.hintUsed ? 'perfect' : 'won');
+        game.dailyResults.push(resultType);
+        if (won) game.dailyPoints += (game.lives * 100) - (game.hintUsed ? 30 : 0);
+      } else {
+        if (won) {
+          game.endlessStreak += 1;
+          if (game.endlessStreak > stats.bestEndlessStreak) {
+            stats.bestEndlessStreak = game.endlessStreak;
+          }
+        } else {
+          game.endlessStreak = 0;
+        }
+      }
+      saveStats(stats);
+
+      document.getElementById('action-bar').classList.add('hidden');
+      document.getElementById('btn-hint').disabled = true;
+      renderCandidatesGrid();
+
+      // Show Reveal Panel
+      const statusEl = document.getElementById('reveal-status');
+      if (won) {
+        statusEl.textContent = game.lives === 3 ? '¡Acertado a la primera!' : '¡Pareja encontrada!';
+        statusEl.className = 'text-xs font-semibold uppercase tracking-wider text-[var(--success)]';
+      } else {
+        statusEl.textContent = 'Sin intentos — Esta era la pareja real';
+        statusEl.className = 'text-xs font-semibold uppercase tracking-wider text-[var(--error)]';
+      }
+
+      const parents = round.candidates.filter(c => c.isParent);
+      const breakdownEl = document.getElementById('reveal-breakdown');
+      breakdownEl.innerHTML = parents.map(p => `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+          <div class="w-16 h-18 rounded-lg overflow-hidden border border-[var(--border)] shrink-0">
+            ${renderPortraitSVG(p.dna)}
+          </div>
+          <div class="space-y-1.5 min-w-0">
+            <div class="text-sm font-bold">${p.name}</div>
+            <div class="flex flex-wrap gap-1">
+              ${p.traits.map(t => `<span class="text-xs px-2 py-0.5 rounded-md bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)]">${t}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      const nextBtn = document.getElementById('btn-next-round');
+      if (game.mode === 'daily' && game.roundIdx === game.rounds.length - 1) {
+        nextBtn.textContent = 'Ver resumen final →';
+      } else {
+        nextBtn.textContent = 'Siguiente ronda →';
+      }
+
+      document.getElementById('reveal-panel').classList.remove('hidden');
+    }
+
+    function nextRound() {
+      if (game.mode === 'daily') {
+        if (game.roundIdx < game.rounds.length - 1) {
+          game.roundIdx += 1;
+          resetRoundState();
+          renderCurrentRound();
+        } else {
+          showDailySummary();
+        }
+      } else {
+        game.rounds.push(generateRound(game.endlessDiff, Math.random));
+        game.roundIdx += 1;
+        resetRoundState();
+        renderCurrentRound();
+      }
+    }
+
+    function resetRoundState() {
+      game.lives = 3;
+      game.selected.clear();
+      game.lockedParents.clear();
+      game.eliminated.clear();
+      game.hintUsed = false;
+      game.roundOver = false;
+    }
+
+    function showDailySummary() {
+      const today = getTodayKey();
+      const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
+
+      if (stats.lastDailyDate !== today) {
+        stats.dailyStreak = wonCount > 0 ? stats.dailyStreak + 1 : 0;
+        stats.lastDailyDate = today;
+      }
+      stats.lastDailyResult = { won: wonCount, points: game.dailyPoints, emojis: game.dailyResults };
+      saveStats(stats);
+
+      const emojiStr = game.dailyResults.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join(' ');
+      document.getElementById('summary-emojis').textContent = emojiStr;
+      document.getElementById('sum-score').textContent = `${wonCount}/5`;
+      document.getElementById('sum-points').textContent = game.dailyPoints;
+      document.getElementById('sum-streak').textContent = stats.dailyStreak;
+      document.getElementById('summary-title').textContent =
+        wonCount === 5 ? '¡Ojo clínico perfecto!' :
+        wonCount >= 3 ? '¡Muy buen ojo!' : '¡Mañana será otro día!';
+      document.getElementById('share-toast').classList.add('hidden');
+
+      updateMenuMeta();
+      showView('summary');
+    }
+
+    // =========================================================================
+    // 10. EVENT LISTENERS & MODALS
+    // =========================================================================
+    document.getElementById('btn-home').addEventListener('click', () => {
+      updateMenuMeta();
+      showView('menu');
+    });
+
+    document.getElementById('btn-demo-refresh').addEventListener('click', renderMenuDemo);
+    document.getElementById('btn-play-daily').addEventListener('click', startDailyGame);
+
+    document.querySelectorAll('.btn-play-endless').forEach(btn => {
+      btn.addEventListener('click', () => startEndlessGame(btn.dataset.diff));
+    });
+
+    document.getElementById('btn-submit').addEventListener('click', submitGuess);
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      game.selected.clear();
+      renderCandidatesGrid();
+      updateActionBar();
+    });
+    document.getElementById('btn-hint').addEventListener('click', useHint);
+    document.getElementById('btn-next-round').addEventListener('click', nextRound);
+
+    document.getElementById('btn-summary-menu').addEventListener('click', () => {
+      updateMenuMeta();
+      showView('menu');
+    });
+
+    document.getElementById('btn-share').addEventListener('click', async () => {
+      const dayNum = getDayNumber();
+      const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
+      const emojiStr = game.dailyResults.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join('');
+      const text = `Face Master #${dayNum} — ${wonCount}/5 (${game.dailyPoints} pts)\n${emojiStr}`;
+      try {
+        await navigator.clipboard.writeText(text);
+        document.getElementById('share-toast').classList.remove('hidden');
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        document.getElementById('share-toast').classList.remove('hidden');
+      }
+    });
+
+    // Modals
+    const backdrop = document.getElementById('modal-backdrop');
+    const modalHelp = document.getElementById('modal-help');
+    const modalStats = document.getElementById('modal-stats');
+
+    function openModal(which) {
+      backdrop.classList.remove('hidden');
+      backdrop.classList.add('flex');
+      modalHelp.classList.toggle('hidden', which !== 'help');
+      modalStats.classList.toggle('hidden', which !== 'stats');
+      if (which === 'stats') {
+        const rate = stats.roundsPlayed ? Math.round((stats.roundsWon / stats.roundsPlayed) * 100) : 0;
+        document.getElementById('st-played').textContent = stats.roundsPlayed;
+        document.getElementById('st-winrate').textContent = `${rate}%`;
+        document.getElementById('st-streak').textContent = stats.dailyStreak;
+        document.getElementById('st-best').textContent = stats.bestEndlessStreak;
+      }
+    }
+
+    function closeModals() {
+      backdrop.classList.add('hidden');
+      backdrop.classList.remove('flex');
+    }
+
+    document.getElementById('btn-help').addEventListener('click', () => openModal('help'));
+    document.getElementById('btn-stats').addEventListener('click', () => openModal('stats'));
+    document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', closeModals));
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModals(); });
+
+    // Boot
+    renderMenuDemo();
+    updateMenuMeta();
+  </script>
+</body>
+</html>
