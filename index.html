@@ -149,6 +149,36 @@
 
     <!-- ==================== GAME VIEW ==================== -->
     <section id="view-game" class="hidden space-y-5">
+      <!-- Sticky Compact Target Bar (floats smoothly when #target-card scrolls out of view) -->
+      <div id="sticky-target-bar" class="fixed top-[60px] left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-[46rem] z-30 bg-[var(--card)]/95 backdrop-blur-sm border border-[var(--border)] rounded-2xl px-3 py-2 shadow-lg transition-all duration-200 opacity-0 -translate-y-2 pointer-events-none">
+        <div class="flex items-center justify-between gap-2.5">
+          <button id="btn-sticky-target" type="button" class="flex items-center gap-2.5 text-left group focus:outline-none" aria-expanded="false" title="Toca para ampliar o reducir el retrato objetivo">
+            <div id="sticky-target-portrait" class="w-12 aspect-[8/9] rounded-xl border-2 border-[var(--primary)] bg-[var(--background)] overflow-hidden shrink-0 group-hover:scale-105 transition"></div>
+            <div class="leading-tight">
+              <div class="text-xs font-semibold text-[var(--foreground)]">Objetivo</div>
+              <div id="sticky-zoom-hint" class="text-[11px] text-[var(--muted-foreground)]">Ampliar ⤢</div>
+            </div>
+          </button>
+
+          <div class="flex flex-col items-center gap-1 min-w-0">
+            <span id="sticky-round-label" class="text-xs font-medium font-mono truncate">Ronda 1 / 5</span>
+            <div id="sticky-lives" class="flex items-center gap-1" aria-label="Intentos restantes"></div>
+          </div>
+
+          <button id="btn-sticky-hint" type="button" class="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--accent)] transition font-medium disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+            Pista
+          </button>
+        </div>
+
+        <!-- Expandable Zoom View (tap portrait to collapse back) -->
+        <div id="sticky-target-zoom" class="hidden pt-3 pb-1 border-t border-[var(--border)] mt-2.5 text-center animate-pop">
+          <button id="btn-sticky-zoom-close" type="button" class="inline-flex flex-col items-center gap-1.5 focus:outline-none group">
+            <div id="sticky-target-portrait-large" class="w-48 sm:w-56 aspect-[8/9] rounded-2xl border-2 border-[var(--primary)] bg-[var(--background)] overflow-hidden shadow-md"></div>
+            <span class="text-xs text-[var(--muted-foreground)] group-hover:text-[var(--foreground)] transition">Toca la cara para hacerla pequeña</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Status Bar -->
       <div class="flex items-center justify-between gap-3 bg-[var(--card)] border border-[var(--border)] rounded-xl px-4 py-2.5">
         <div class="flex items-center gap-2.5">
@@ -164,7 +194,7 @@
       </div>
 
       <!-- Target Child Card -->
-      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-5">
+      <div id="target-card" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-5">
         <div class="relative shrink-0">
           <div id="target-portrait" class="w-36 h-40 sm:w-40 sm:h-44 rounded-2xl border-2 border-[var(--border)] bg-[var(--background)] overflow-hidden shadow-sm"></div>
           <span class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--card)] border border-[var(--border)] whitespace-nowrap shadow-sm">
@@ -212,6 +242,7 @@
             Siguiente ronda →
           </button>
         </div>
+        <div id="reveal-skin-blend" class="rounded-xl bg-[var(--background)] border border-[var(--border)] p-3"></div>
         <div id="reveal-breakdown" class="grid sm:grid-cols-2 gap-3"></div>
       </div>
     </section>
@@ -1253,6 +1284,9 @@
       Object.entries(views).forEach(([k, el]) => {
         el.classList.toggle('hidden', k !== name);
       });
+      if (name !== 'game') {
+        setStickyBarVisible(false);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1391,15 +1425,56 @@
       return game.rounds[game.roundIdx];
     }
 
-    function renderLives() {
-      const el = document.getElementById('game-lives');
-      el.innerHTML = '';
-      for (let i = 0; i < 3; i++) {
-        const alive = i < game.lives;
-        const dot = document.createElement('span');
-        dot.className = `w-2.5 h-2.5 rounded-full transition ${alive ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'}`;
-        el.appendChild(dot);
+    let stickyTargetZoomed = false;
+    let stickyBarVisible = false;
+
+    function setStickyZoom(open) {
+      stickyTargetZoomed = Boolean(open);
+      const zoomPanel = document.getElementById('sticky-target-zoom');
+      const hintLabel = document.getElementById('sticky-zoom-hint');
+      const toggleBtn = document.getElementById('btn-sticky-target');
+      if (zoomPanel) zoomPanel.classList.toggle('hidden', !stickyTargetZoomed);
+      if (hintLabel) hintLabel.textContent = stickyTargetZoomed ? 'Reducir ⤡' : 'Ampliar ⤢';
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(stickyTargetZoomed));
+    }
+
+    function setStickyBarVisible(visible) {
+      stickyBarVisible = Boolean(visible);
+      const bar = document.getElementById('sticky-target-bar');
+      if (!bar) return;
+      if (stickyBarVisible) {
+        bar.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+        bar.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        bar.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+        bar.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+        setStickyZoom(false);
       }
+    }
+
+    function syncHintButtons() {
+      const disabled = game.hintUsed || game.roundOver;
+      const text = game.hintUsed ? 'Pista usada' : 'Pista';
+      ['btn-hint', 'btn-sticky-hint'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = disabled;
+        btn.textContent = text;
+      });
+    }
+
+    function renderLives() {
+      ['game-lives', 'sticky-lives'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+          const alive = i < game.lives;
+          const dot = document.createElement('span');
+          dot.className = `w-2.5 h-2.5 rounded-full transition ${alive ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'}`;
+          el.appendChild(dot);
+        }
+      });
     }
 
     function setBanner(text, type = 'neutral') {
@@ -1424,21 +1499,25 @@
 
     function renderCurrentRound() {
       const round = getCurrentRound();
+      const diffLabel = round.difficulty === 'easy' ? 'Fácil' : round.difficulty === 'medium' ? 'Media' : 'Difícil';
 
       document.getElementById('game-mode-label').textContent =
-        game.mode === 'daily' ? 'Reto Diario' :
-        `Práctica · ${game.endlessDiff === 'easy' ? 'Fácil' : game.endlessDiff === 'medium' ? 'Media' : 'Difícil'}`;
+        game.mode === 'daily' ? `Reto Diario · ${diffLabel}` : `Práctica · ${diffLabel}`;
 
-      document.getElementById('game-round-label').textContent =
-        game.mode === 'daily' ? `Ronda ${game.roundIdx + 1} / ${game.rounds.length}` : `Racha: ${game.endlessStreak}`;
+      const roundText = game.mode === 'daily'
+        ? `Ronda ${game.roundIdx + 1} / ${game.rounds.length}`
+        : `Racha: ${game.endlessStreak}`;
+      document.getElementById('game-round-label').textContent = roundText;
+      document.getElementById('sticky-round-label').textContent = `${roundText} · ${diffLabel}`;
 
       renderLives();
-
-      const hintBtn = document.getElementById('btn-hint');
-      hintBtn.disabled = game.hintUsed || game.roundOver;
-      hintBtn.textContent = game.hintUsed ? 'Pista usada' : 'Pista';
+      syncHintButtons();
+      setStickyZoom(false);
 
       document.getElementById('target-portrait').innerHTML = renderPortraitSVG(round.child);
+      document.getElementById('sticky-target-portrait').innerHTML = renderPortraitSVG(round.child);
+      document.getElementById('sticky-target-portrait-large').innerHTML = renderPortraitSVG(round.child);
+
       document.getElementById('reveal-panel').classList.add('hidden');
       document.getElementById('action-bar').classList.toggle('hidden', game.roundOver);
       setBanner('');
@@ -1592,8 +1671,7 @@
       game.selected.delete(toRemove);
       game.hintUsed = true;
 
-      document.getElementById('btn-hint').disabled = true;
-      document.getElementById('btn-hint').textContent = 'Pista usada';
+      syncHintButtons();
       setBanner(`<strong>Pista:</strong> Hemos descartado a ${round.candidates[toRemove].name}.`, 'neutral');
 
       saveDailyProgress();
@@ -1604,7 +1682,8 @@
     function renderRevealPanel(won) {
       const round = getCurrentRound();
       document.getElementById('action-bar').classList.add('hidden');
-      document.getElementById('btn-hint').disabled = true;
+      syncHintButtons();
+      setStickyBarVisible(false);
 
       const statusEl = document.getElementById('reveal-status');
       if (won) {
@@ -1616,6 +1695,39 @@
       }
 
       const parents = round.candidates.filter(c => c.isParent);
+      const skinBlendEl = document.getElementById('reveal-skin-blend');
+      if (skinBlendEl && parents.length === 2) {
+        skinBlendEl.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-11 aspect-[8/9] rounded-lg overflow-hidden border border-[var(--primary)] bg-[var(--card)] shrink-0">
+                ${renderPortraitSVG(round.child)}
+              </div>
+              <div class="leading-tight">
+                <div class="text-xs font-semibold text-[var(--foreground)]">Mezcla de tono de piel</div>
+                <div class="text-[11px] text-[var(--muted-foreground)]">Combinación de ambos progenitores</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full border border-black/20 inline-block" style="background:${parents[0].dna.skinBase}"></span>
+                <span class="font-medium text-[var(--foreground)]">${parents[0].name}</span>
+              </span>
+              <span>+</span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full border border-black/20 inline-block" style="background:${parents[1].dna.skinBase}"></span>
+                <span class="font-medium text-[var(--foreground)]">${parents[1].name}</span>
+              </span>
+              <span>→</span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full border-2 border-[var(--primary)] inline-block" style="background:${round.child.skinBase}"></span>
+                <span class="font-semibold text-[var(--foreground)]">Objetivo</span>
+              </span>
+            </div>
+          </div>
+        `;
+      }
+
       const breakdownEl = document.getElementById('reveal-breakdown');
       breakdownEl.innerHTML = parents.map(p => `
         <div class="flex items-center gap-3 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
@@ -1771,7 +1883,29 @@
       updateActionBar();
     });
     document.getElementById('btn-hint').addEventListener('click', useHint);
+    document.getElementById('btn-sticky-hint').addEventListener('click', useHint);
+    document.getElementById('btn-sticky-target').addEventListener('click', () => {
+      setStickyZoom(!stickyTargetZoomed);
+    });
+    document.getElementById('btn-sticky-zoom-close').addEventListener('click', () => {
+      setStickyZoom(false);
+    });
     document.getElementById('btn-next-round').addEventListener('click', nextRound);
+
+    // Show floating sticky target bar when #target-card scrolls out of view
+    const targetCardEl = document.getElementById('target-card');
+    if (targetCardEl && typeof IntersectionObserver !== 'undefined') {
+      const targetObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          const inGame = !views.game.classList.contains('hidden');
+          const shouldShow = inGame && !game.roundOver && !entry.isIntersecting && entry.boundingClientRect.bottom < 80;
+          setStickyBarVisible(shouldShow);
+        },
+        { rootMargin: '-60px 0px 0px 0px', threshold: 0.05 }
+      );
+      targetObserver.observe(targetCardEl);
+    }
 
     document.getElementById('btn-summary-menu').addEventListener('click', () => {
       updateMenuMeta();
