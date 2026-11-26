@@ -75,6 +75,12 @@
   <!-- Main Content Container -->
   <main class="flex-1 w-full max-w-3xl mx-auto px-4 py-6">
 
+    <!-- Storage Warning Banner (only shown if localStorage fails) -->
+    <div id="storage-warning" class="hidden mb-4 rounded-xl px-4 py-2.5 text-xs sm:text-sm border border-[var(--warning)] bg-[var(--card)] text-[var(--foreground)] flex items-center justify-between gap-3">
+      <span>No se pudo guardar tu progreso en este navegador. Podrás jugar, pero tus estadísticas y racha no se conservarán.</span>
+      <button id="btn-dismiss-storage-warning" type="button" class="text-xs px-2 py-1 rounded-lg hover:bg-[var(--accent)] shrink-0">✕</button>
+    </div>
+
     <!-- ==================== MENU VIEW ==================== -->
     <section id="view-menu" class="animate-pop space-y-6">
       <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 sm:p-8 text-center space-y-6">
@@ -261,7 +267,7 @@
         <p>En cada ronda verás un <strong class="text-[var(--foreground)]">retrato objetivo</strong> arriba y varios candidatos abajo.</p>
         <p>Tu objetivo es encontrar a las <strong class="text-[var(--foreground)]">2 personas</strong> de las que ha salido. Pueden ser de cualquier género.</p>
         <ul class="list-disc pl-5 space-y-1.5">
-          <li>El rostro hereda rasgos de ambos: <strong class="text-[var(--foreground)]">forma de cara, ojos, cejas, nariz, boca, pelo</strong> y rasgos especiales (<strong class="text-[var(--foreground)]">pecas, lunares, hoyuelos, barbilla</strong>).</li>
+          <li>El rostro hereda rasgos de ambos: <strong class="text-[var(--foreground)]">forma de cara, ojos, cejas, nariz, boca, pelo</strong> y rasgos especiales (<strong class="text-[var(--foreground)]">pecas, lunares, hoyuelos, barbilla</strong>). En <strong class="text-[var(--foreground)]">Difícil</strong>, el peinado y el color de pelo pueden venir de progenitores distintos.</li>
           <li>El <strong class="text-[var(--foreground)]">tono de piel</strong> es una mezcla entre ambos progenitores.</li>
           <li>La ropa es aleatoria y <em>no</em> se hereda.</li>
           <li>Tienes <strong class="text-[var(--foreground)]">3 intentos</strong>. Si aciertas 1 de los 2, queda fijado en verde y el otro se descarta.</li>
@@ -328,10 +334,24 @@
       return `${y}-${m}-${d}`;
     }
 
-    function getDayNumber() {
-      const epoch = new Date(2026, 0, 1);
-      const now = new Date();
-      const diff = Math.floor((now - epoch) / (1000 * 60 * 60 * 24));
+    function parseDateKeyToUTC(key) {
+      if (!key || typeof key !== 'string') return NaN;
+      const parts = key.split('-').map(Number);
+      if (parts.length !== 3 || parts.some(Number.isNaN)) return NaN;
+      return Date.UTC(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function daysBetweenKeys(keyA, keyB) {
+      const a = parseDateKeyToUTC(keyA);
+      const b = parseDateKeyToUTC(keyB);
+      if (Number.isNaN(a) || Number.isNaN(b)) return Infinity;
+      return Math.round((b - a) / (1000 * 60 * 60 * 24));
+    }
+
+    function getDayNumber(dateKey = getTodayKey()) {
+      const epochUTC = Date.UTC(2026, 0, 1);
+      const targetUTC = parseDateKeyToUTC(dateKey);
+      const diff = Math.round((targetUTC - epochUTC) / (1000 * 60 * 60 * 24));
       return Math.max(1, diff + 1);
     }
 
@@ -339,38 +359,38 @@
     // 2. GENETIC TRAIT DEFINITIONS & PALETTES
     // =========================================================================
     const SKINS = [
-      { id: 0, base: '#FCE2D2', shade: '#E8BFA7' },
-      { id: 1, base: '#F1C7A8', shade: '#D6A37E' },
-      { id: 2, base: '#DDA77B', shade: '#BD8356' },
-      { id: 3, base: '#BD8154', shade: '#996037' },
-      { id: 4, base: '#8F5934', shade: '#6E3E1F' },
-      { id: 5, base: '#5E3924', shade: '#402414' }
+      { id: 0, base: '#FCE2D2', shade: '#E4B89E', blush: '#E99695', lip: '#D38282' },
+      { id: 1, base: '#F1C7A8', shade: '#D29E79', blush: '#DF8B86', lip: '#C67470' },
+      { id: 2, base: '#DDA77B', shade: '#B97E52', blush: '#CE7A72', lip: '#B5665F' },
+      { id: 3, base: '#BD8154', shade: '#965C33', blush: '#B4645B', lip: '#9B534B' },
+      { id: 4, base: '#8F5934', shade: '#6A3B1C', blush: '#934D46', lip: '#7B3F38' },
+      { id: 5, base: '#5E3924', shade: '#3E2212', blush: '#743A35', lip: '#5E2E29' }
     ];
 
     const HAIR_COLORS = [
-      { id: 'black',     hex: '#1E1D21', label: 'Pelo negro' },
-      { id: 'darkBrown', hex: '#4A3123', label: 'Pelo castaño oscuro' },
-      { id: 'chestnut',  hex: '#825032', label: 'Pelo castaño claro' },
-      { id: 'auburn',    hex: '#A84227', label: 'Pelo pelirrojo' },
-      { id: 'blonde',    hex: '#D9AE5B', label: 'Pelo rubio' },
-      { id: 'silver',    hex: '#B4B7BE', label: 'Pelo plateado' }
+      { id: 'black',     hex: '#1E1D22', highlight: '#3A3842', label: 'Pelo negro' },
+      { id: 'darkBrown', hex: '#4A3022', highlight: '#6D4A36', label: 'Pelo castaño oscuro' },
+      { id: 'chestnut',  hex: '#845132', highlight: '#AA6E48', label: 'Pelo castaño claro' },
+      { id: 'auburn',    hex: '#A94426', highlight: '#CC6340', label: 'Pelo pelirrojo' },
+      { id: 'blonde',    hex: '#D8AD58', highlight: '#EECA7C', label: 'Pelo rubio' },
+      { id: 'silver',    hex: '#AEB3BC', highlight: '#D2D6DE', label: 'Pelo plateado' }
     ];
 
     const EYE_COLORS = [
-      { id: 'dark',  hex: '#2B1F19', label: 'Ojos oscuros' },
-      { id: 'hazel', hex: '#7C582B', label: 'Ojos avellana' },
-      { id: 'green', hex: '#3B7A57', label: 'Ojos verdes' },
-      { id: 'blue',  hex: '#3A6EA5', label: 'Ojos azules' },
-      { id: 'gray',  hex: '#6B7B8C', label: 'Ojos grises' }
+      { id: 'dark',  hex: '#2C1E16', ring: '#160E0A', label: 'Ojos oscuros' },
+      { id: 'hazel', hex: '#8A612D', ring: '#593C18', label: 'Ojos avellana' },
+      { id: 'green', hex: '#377A55', ring: '#204E35', label: 'Ojos verdes' },
+      { id: 'blue',  hex: '#366FA8', ring: '#1F466E', label: 'Ojos azules' },
+      { id: 'gray',  hex: '#6C7E91', ring: '#455362', label: 'Ojos grises' }
     ];
 
-    const FACE_SHAPES = ['oval', 'round', 'square', 'heart'];
-    const EYE_SHAPES  = ['almond', 'round', 'hooded', 'upturned'];
-    const EYEBROWS    = ['thick', 'arched', 'straight', 'soft'];
-    const NOSES       = ['button', 'straight', 'wide', 'aquiline'];
-    const MOUTHS      = ['smile', 'full', 'thin', 'serene'];
-    const HAIR_STYLES = ['shortCrop', 'curlyAfro', 'bob', 'longWavy', 'bun', 'buzz', 'sidePart', 'shaggy'];
-    const MARKS       = ['none', 'freckles', 'beautyMark', 'dimples', 'cleftChin', 'rosyCheeks'];
+    const FACE_SHAPES = ['oval', 'round', 'square', 'heart', 'long'];
+    const EYE_SHAPES  = ['almond', 'round', 'hooded', 'upturned', 'downturned'];
+    const EYEBROWS    = ['thick', 'arched', 'straight', 'soft', 'angled'];
+    const NOSES       = ['button', 'straight', 'wide', 'aquiline', 'upturned'];
+    const MOUTHS      = ['smile', 'full', 'thin', 'serene', 'wide'];
+    const HAIR_STYLES = ['shortCrop', 'curlyAfro', 'bob', 'longWavy', 'bun', 'buzz', 'sidePart', 'shaggy', 'braids', 'curlyShort'];
+    const MARKS       = ['none', 'freckles', 'beautyMark', 'dimples', 'cleftChin', 'rosyCheeks', 'moleLip'];
 
     const SHIRT_COLORS = [
       '#5B7065', '#6C7A89', '#8E6C88', '#A66E5E',
@@ -391,15 +411,18 @@
       nose:      'Nariz',
       mouth:     'Boca',
       hair:      'Pelo',
+      hairStyle: 'Peinado',
+      hairColor: 'Color de pelo',
       mark:      'Rasgo especial'
     };
 
     const MARK_NAMES = {
       freckles:   'Pecas',
-      beautyMark: 'Lunar',
+      beautyMark: 'Lunar en mejilla',
       dimples:    'Hoyuelos',
       cleftChin:  'Barbilla partida',
-      rosyCheeks: 'Mejillas sonrosadas'
+      rosyCheeks: 'Mejillas sonrosadas',
+      moleLip:    'Lunar sobre el labio'
     };
 
     // Helper: pick random element with RNG
@@ -431,13 +454,17 @@
     // =========================================================================
     // 3. DNA GENERATION & INHERITANCE ENGINE
     // =========================================================================
-    function createRandomDNA(rng) {
-      const skinObj = pick(SKINS, rng);
+    function createRandomDNA(rng, forcedSkinId = null) {
+      const skinObj = forcedSkinId !== null
+        ? SKINS[Math.max(0, Math.min(SKINS.length - 1, Math.round(forcedSkinId)))]
+        : pick(SKINS, rng);
       const markRoll = rng();
-      const mark = markRoll < 0.35 ? 'none' : pick(MARKS.slice(1), rng);
+      const mark = markRoll < 0.32 ? 'none' : pick(MARKS.slice(1), rng);
       return {
         skinBase: skinObj.base,
         skinShade: skinObj.shade,
+        skinBlush: skinObj.blush,
+        skinLip: skinObj.lip,
         skinId: skinObj.id,
         faceShape: pick(FACE_SHAPES, rng),
         eyeShape: pick(EYE_SHAPES, rng),
@@ -459,16 +486,20 @@
       if (a.eyebrows !== b.eyebrows) diff++;
       if (a.nose !== b.nose) diff++;
       if (a.mouth !== b.mouth) diff++;
-      if (a.hairStyle !== b.hairStyle || a.hairColor !== b.hairColor) diff++;
+      if (a.hairStyle !== b.hairStyle) diff++;
+      if (a.hairColor !== b.hairColor) diff++;
       if (Math.abs(a.skinId - b.skinId) >= 1) diff++;
       return diff;
     }
 
-    function generateChild(parentA, parentB, rng) {
-      // Split the 6 core visual trait groups cleanly: 3 from A, 3 from B
-      const coreGroups = shuffle(['faceShape', 'eyes', 'eyebrows', 'nose', 'mouth', 'hair'], rng);
-      const fromA = new Set(coreGroups.slice(0, 3));
-      const fromB = new Set(coreGroups.slice(3, 6));
+    function generateChild(parentA, parentB, rng, difficulty = 'medium') {
+      const splitHair = difficulty === 'hard';
+      const groups = splitHair
+        ? shuffle(['faceShape', 'eyes', 'eyebrows', 'nose', 'mouth', 'hairStyle', 'hairColor'], rng)
+        : shuffle(['faceShape', 'eyes', 'eyebrows', 'nose', 'mouth', 'hair'], rng);
+
+      const splitAt = splitHair ? (rng() < 0.5 ? 3 : 4) : 3;
+      const fromA = new Set(groups.slice(0, splitAt));
 
       const inheritedFromA = [];
       const inheritedFromB = [];
@@ -483,18 +514,28 @@
         }
       };
 
-      const faceSrc = choose('faceShape');
-      const eyeSrc  = choose('eyes');
-      const browSrc = choose('eyebrows');
-      const noseSrc = choose('nose');
+      const faceSrc  = choose('faceShape');
+      const eyeSrc   = choose('eyes');
+      const browSrc  = choose('eyebrows');
+      const noseSrc  = choose('nose');
       const mouthSrc = choose('mouth');
-      const hairSrc = choose('hair');
+      let hairStyleSrc, hairColorSrc;
+      if (splitHair) {
+        hairStyleSrc = choose('hairStyle');
+        hairColorSrc = choose('hairColor');
+      } else {
+        const hairSrc = choose('hair');
+        hairStyleSrc = hairSrc;
+        hairColorSrc = hairSrc;
+      }
 
-      // Blend skin tone smoothly between A and B
-      const t = 0.4 + rng() * 0.2;
-      const skinBase = blendHex(parentA.skinBase, parentB.skinBase, t);
+      // Blend skin palette smoothly between A and B
+      const t = 0.42 + rng() * 0.16;
+      const skinBase  = blendHex(parentA.skinBase, parentB.skinBase, t);
       const skinShade = blendHex(parentA.skinShade, parentB.skinShade, t);
-      const skinId = (parentA.skinId + parentB.skinId) / 2;
+      const skinBlush = blendHex(parentA.skinBlush, parentB.skinBlush, t);
+      const skinLip   = blendHex(parentA.skinLip, parentB.skinLip, t);
+      const skinId    = parentA.skinId + (parentB.skinId - parentA.skinId) * t;
 
       // Special mark inheritance
       let mark = 'none';
@@ -517,6 +558,8 @@
       const dna = {
         skinBase,
         skinShade,
+        skinBlush,
+        skinLip,
         skinId,
         faceShape: faceSrc.faceShape,
         eyeShape: eyeSrc.eyeShape,
@@ -524,8 +567,8 @@
         eyebrows: browSrc.eyebrows,
         nose: noseSrc.nose,
         mouth: mouthSrc.mouth,
-        hairStyle: hairSrc.hairStyle,
-        hairColor: hairSrc.hairColor,
+        hairStyle: hairStyleSrc.hairStyle,
+        hairColor: hairColorSrc.hairColor,
         mark,
         shirtColor: pick(SHIRT_COLORS, rng)
       };
@@ -533,57 +576,205 @@
       return { dna, inheritedFromA, inheritedFromB };
     }
 
-    function similarityToChild(candidate, child) {
+    function isSkinPairCompatible(a, b, childSkinId) {
+      const avg = (a.skinId + b.skinId) / 2;
+      return Math.abs(avg - childSkinId) <= 0.65;
+    }
+
+    function similarityToChild(candidate, child, splitHair) {
       let score = 0;
       if (candidate.faceShape === child.faceShape) score += 1;
       if (candidate.eyeShape === child.eyeShape && candidate.eyeColor === child.eyeColor) score += 1.4;
+      else if (candidate.eyeColor === child.eyeColor) score += 0.4;
       if (candidate.eyebrows === child.eyebrows) score += 0.8;
       if (candidate.nose === child.nose) score += 1;
       if (candidate.mouth === child.mouth) score += 1;
-      if (candidate.hairStyle === child.hairStyle && candidate.hairColor === child.hairColor) score += 1.4;
+      if (splitHair) {
+        if (candidate.hairStyle === child.hairStyle) score += 0.9;
+        if (candidate.hairColor === child.hairColor) score += 0.8;
+      } else {
+        if (candidate.hairStyle === child.hairStyle && candidate.hairColor === child.hairColor) score += 1.4;
+        else if (candidate.hairStyle === child.hairStyle || candidate.hairColor === child.hairColor) score += 0.45;
+      }
       if (child.mark !== 'none' && candidate.mark === child.mark) score += 1;
       return score;
+    }
+
+    function countExplainedTraits(a, b, child, splitHair) {
+      let explained = 0;
+      if (a.faceShape === child.faceShape || b.faceShape === child.faceShape) explained++;
+      if ((a.eyeShape === child.eyeShape && a.eyeColor === child.eyeColor) ||
+          (b.eyeShape === child.eyeShape && b.eyeColor === child.eyeColor)) explained++;
+      if (a.eyebrows === child.eyebrows || b.eyebrows === child.eyebrows) explained++;
+      if (a.nose === child.nose || b.nose === child.nose) explained++;
+      if (a.mouth === child.mouth || b.mouth === child.mouth) explained++;
+      if (splitHair) {
+        if (a.hairStyle === child.hairStyle || b.hairStyle === child.hairStyle) explained++;
+        if (a.hairColor === child.hairColor || b.hairColor === child.hairColor) explained++;
+      } else {
+        if ((a.hairStyle === child.hairStyle && a.hairColor === child.hairColor) ||
+            (b.hairStyle === child.hairStyle && b.hairColor === child.hairColor)) explained++;
+      }
+      if (child.mark !== 'none' && (a.mark === child.mark || b.mark === child.mark)) explained++;
+      return explained;
+    }
+
+    function getTotalRequiredTraits(child, splitHair) {
+      return (splitHair ? 7 : 6) + (child.mark !== 'none' ? 1 : 0);
+    }
+
+    function getCompatibleSkinPairs(childSkinId) {
+      const pairs = [];
+      for (let i = 0; i < SKINS.length; i++) {
+        for (let j = i; j < SKINS.length; j++) {
+          if (Math.abs((i + j) / 2 - childSkinId) <= 0.65) {
+            pairs.push([i, j]);
+          }
+        }
+      }
+      return pairs;
+    }
+
+    function buildDecoyWithTargets(rng, child, existing, splitHair, forcedSkinId, minSim, maxSim, requiredTotal, parentA, parentB, minUnexplainedGap) {
+      const pool = [parentA, parentB, ...existing];
+      let best = null;
+      let bestPenalty = Infinity;
+
+      for (let tries = 0; tries < 70; tries++) {
+        const d = createRandomDNA(rng, forcedSkinId);
+
+        // In Medium/Hard, occasionally inject 1-2 traits from the child so decoys are credible red herrings
+        if (minSim > 0 && rng() < 0.65) {
+          const traitRoll = pick(['faceShape', 'eyes', 'eyebrows', 'nose', 'mouth', 'hairStyle', 'hairColor'], rng);
+          if (traitRoll === 'faceShape') d.faceShape = child.faceShape;
+          else if (traitRoll === 'eyes') { d.eyeShape = child.eyeShape; d.eyeColor = child.eyeColor; }
+          else if (traitRoll === 'eyebrows') d.eyebrows = child.eyebrows;
+          else if (traitRoll === 'nose') d.nose = child.nose;
+          else if (traitRoll === 'mouth') d.mouth = child.mouth;
+          else if (traitRoll === 'hairStyle') d.hairStyle = child.hairStyle;
+          else if (traitRoll === 'hairColor') d.hairColor = child.hairColor;
+        }
+
+        const sim = similarityToChild(d, child, splitHair);
+        const tooClose =
+          countCoreDifferences(d, parentA) < 3 ||
+          countCoreDifferences(d, parentB) < 3 ||
+          existing.some(x => countCoreDifferences(d, x) < 3);
+
+        // Verify uniqueness: no pair involving this decoy can explain all (or almost all) traits
+        let maxPairExplained = 0;
+        for (const other of pool) {
+          const exp = countExplainedTraits(d, other, child, splitHair);
+          if (exp > maxPairExplained) maxPairExplained = exp;
+        }
+        const uniqueOk = maxPairExplained <= requiredTotal - minUnexplainedGap;
+
+        if (!tooClose && uniqueOk && sim >= minSim && sim <= maxSim) {
+          return d;
+        }
+
+        // Track best candidate so we never fall back blindly to the first random person
+        let penalty = 0;
+        if (!uniqueOk) penalty += 100 + (maxPairExplained - (requiredTotal - minUnexplainedGap)) * 30;
+        if (tooClose) penalty += 40;
+        if (sim < minSim) penalty += (minSim - sim) * 10;
+        if (sim > maxSim) penalty += (sim - maxSim) * 10;
+
+        if (penalty < bestPenalty) {
+          bestPenalty = penalty;
+          best = d;
+        }
+      }
+      return best;
+    }
+
+    function hasUniqueSolution(parentA, parentB, decoys, child, splitHair, minGap) {
+      const required = getTotalRequiredTraits(child, splitHair);
+      const all = [parentA, parentB, ...decoys];
+      for (let i = 0; i < all.length; i++) {
+        for (let j = i + 1; j < all.length; j++) {
+          if (i === 0 && j === 1) continue; // real parents
+          const exp = countExplainedTraits(all[i], all[j], child, splitHair);
+          if (exp > required - minGap) return false;
+        }
+      }
+      return true;
+    }
+
+    function countCompatibleDecoySkinPairs(decoys, childSkinId) {
+      let count = 0;
+      for (let i = 0; i < decoys.length; i++) {
+        for (let j = i + 1; j < decoys.length; j++) {
+          if (isSkinPairCompatible(decoys[i], decoys[j], childSkinId)) count++;
+        }
+      }
+      return count;
     }
 
     function generateRound(difficulty, rng) {
       const countMap = { easy: 4, medium: 6, hard: 8 };
       const numCandidates = countMap[difficulty] || 6;
+      const splitHair = difficulty === 'hard';
+      const minSim = difficulty === 'easy' ? 0 : difficulty === 'medium' ? 0.9 : 1.4;
+      const maxSim = difficulty === 'easy' ? 1.6 : difficulty === 'medium' ? 2.6 : 3.3;
+      const requiredSkinPairs = difficulty === 'easy' ? 0 : difficulty === 'medium' ? 1 : 2;
+      const minUnexplainedGap = difficulty === 'easy' ? 2 : 1;
 
-      // Generate two distinct parents
-      const parentA = createRandomDNA(rng);
-      let parentB = createRandomDNA(rng);
-      let guard = 0;
-      while (countCoreDifferences(parentA, parentB) < 5 && guard < 40) {
-        parentB = createRandomDNA(rng);
-        guard++;
-      }
+      let chosenRound = null;
 
-      const { dna: child, inheritedFromA, inheritedFromB } = generateChild(parentA, parentB, rng);
-
-      // Generate decoys calibrated by difficulty
-      const maxDecoySim = difficulty === 'easy' ? 1.5 : difficulty === 'medium' ? 2.4 : 3.2;
-      const minDecoySim = difficulty === 'hard' ? 1.0 : 0;
-
-      const decoys = [];
-      for (let i = 0; i < numCandidates - 2; i++) {
-        let bestDecoy = null;
-        for (let tries = 0; tries < 50; tries++) {
-          const d = createRandomDNA(rng);
-          const sim = similarityToChild(d, child);
-          const tooCloseToParent =
-            countCoreDifferences(d, parentA) < 3 ||
-            countCoreDifferences(d, parentB) < 3 ||
-            decoys.some(x => countCoreDifferences(d, x) < 3);
-
-          if (!tooCloseToParent && sim >= minDecoySim && sim <= maxDecoySim) {
-            bestDecoy = d;
-            break;
-          }
-          if (!bestDecoy) bestDecoy = d;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        // Generate two clearly distinct parents
+        const parentA = createRandomDNA(rng);
+        let parentB = createRandomDNA(rng);
+        let guard = 0;
+        while (countCoreDifferences(parentA, parentB) < 5 && guard < 40) {
+          parentB = createRandomDNA(rng);
+          guard++;
         }
-        decoys.push(bestDecoy);
+
+        const { dna: child, inheritedFromA, inheritedFromB } = generateChild(parentA, parentB, rng, difficulty);
+        const requiredTotal = getTotalRequiredTraits(child, splitHair);
+
+        // Plan skin IDs for decoys so Medium/Hard always include skin-compatible "alibi" pairs
+        const compatiblePairs = getCompatibleSkinPairs(child.skinId);
+        const decoySkinPlan = [];
+        const numDecoys = numCandidates - 2;
+
+        if (requiredSkinPairs > 0 && compatiblePairs.length > 0) {
+          // Pair 1 mirrors the real parents' skin tones (or a very close compatible pair)
+          decoySkinPlan.push(parentA.skinId, parentB.skinId);
+          if (requiredSkinPairs >= 2 && numDecoys >= 4) {
+            const altPair = pick(compatiblePairs, rng);
+            decoySkinPlan.push(altPair[0], altPair[1]);
+          }
+        }
+        while (decoySkinPlan.length < numDecoys) {
+          // Remaining decoys: in Hard bias toward nearby skin tones; in Easy/Medium free
+          if (difficulty === 'hard' && compatiblePairs.length > 0 && rng() < 0.5) {
+            const nearSkin = Math.max(0, Math.min(SKINS.length - 1, Math.round(child.skinId + (rng() < 0.5 ? -1 : 1))));
+            decoySkinPlan.push(nearSkin);
+          } else {
+            decoySkinPlan.push(null);
+          }
+        }
+
+        const decoys = [];
+        for (let i = 0; i < numDecoys; i++) {
+          const d = buildDecoyWithTargets(
+            rng, child, decoys, splitHair, decoySkinPlan[i],
+            minSim, maxSim, requiredTotal, parentA, parentB, minUnexplainedGap
+          );
+          decoys.push(d);
+        }
+
+        const uniqueOk = hasUniqueSolution(parentA, parentB, decoys, child, splitHair, minUnexplainedGap);
+        const skinPairsOk = countCompatibleDecoySkinPairs(decoys, child.skinId) >= requiredSkinPairs;
+
+        chosenRound = { parentA, parentB, child, inheritedFromA, inheritedFromB, decoys };
+        if (uniqueOk && skinPairsOk) break;
       }
 
+      const { parentA, parentB, child, inheritedFromA, inheritedFromB, decoys } = chosenRound;
       const names = shuffle(NAMES, rng).slice(0, numCandidates);
       const rawCandidates = [
         { id: 'A', dna: parentA, isParent: true, traits: inheritedFromA },
@@ -606,173 +797,258 @@
     }
 
     // =========================================================================
-    // 4. EDITORIAL SVG PORTRAIT RENDERER
+    // 4. EDITORIAL REALISTIC SVG PORTRAIT RENDERER
     // =========================================================================
+    let svgUid = 0;
+
     function renderPortraitSVG(dna) {
-      const hairHex = (HAIR_COLORS.find(h => h.id === dna.hairColor) || HAIR_COLORS[0]).hex;
-      const eyeHex  = (EYE_COLORS.find(e => e.id === dna.eyeColor) || EYE_COLORS[0]).hex;
-      const stroke  = '#231F20';
+      const uid = ++svgUid;
+      const hairObj = HAIR_COLORS.find(h => h.id === dna.hairColor) || HAIR_COLORS[0];
+      const eyeObj  = EYE_COLORS.find(e => e.id === dna.eyeColor) || EYE_COLORS[0];
+      const hairHex = hairObj.hex;
+      const hairHi  = hairObj.highlight;
+      const eyeHex  = eyeObj.hex;
+      const eyeRing = eyeObj.ring;
+      const stroke  = '#241E1C';
+      const skinBlush = dna.skinBlush || '#DF8B86';
+      const skinLip   = dna.skinLip || '#B86A66';
 
       // --- Back Hair Layer ---
       let backHair = '';
       if (dna.hairStyle === 'longWavy') {
-        backHair = `<path d="M32,78 C24,110 26,145 36,162 L124,162 C134,145 136,110 128,78 C122,38 38,38 32,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        backHair = `
+          <path d="M30,76 C22,110 24,148 34,166 C48,162 56,166 66,164 L94,164 C104,166 112,162 126,166 C136,148 138,110 130,76 C124,34 36,34 30,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M36,96 C32,118 35,140 42,156" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+          <path d="M124,96 C128,118 125,140 118,156" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.hairStyle === 'bob') {
-        backHair = `<path d="M33,76 C28,104 31,130 43,138 L117,138 C129,130 132,104 127,76 C122,38 38,38 33,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        backHair = `
+          <path d="M32,76 C27,104 30,130 43,139 L117,139 C130,130 133,104 128,76 C122,36 38,36 32,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M38,94 C35,110 38,124 46,133" fill="none" stroke="${hairHi}" stroke-width="1.8" stroke-linecap="round" opacity="0.4"/>
+          <path d="M122,94 C125,110 122,124 114,133" fill="none" stroke="${hairHi}" stroke-width="1.8" stroke-linecap="round" opacity="0.4"/>`;
       } else if (dna.hairStyle === 'curlyAfro') {
         backHair = `
-          <g fill="${hairHex}" stroke="${stroke}" stroke-width="2.2">
-            <circle cx="80" cy="54" r="44"/>
-            <circle cx="42" cy="70" r="24"/>
-            <circle cx="118" cy="70" r="24"/>
-            <circle cx="38" cy="96" r="18"/>
-            <circle cx="122" cy="96" r="18"/>
+          <g fill="${hairHex}" stroke="${stroke}" stroke-width="2">
+            <circle cx="80" cy="54" r="45"/>
+            <circle cx="40" cy="70" r="24"/>
+            <circle cx="120" cy="70" r="24"/>
+            <circle cx="36" cy="98" r="18"/>
+            <circle cx="124" cy="98" r="18"/>
+          </g>
+          <g fill="none" stroke="${hairHi}" stroke-width="1.8" stroke-linecap="round" opacity="0.42">
+            <path d="M52,26 Q62,20 72,26"/>
+            <path d="M86,24 Q98,20 108,28"/>
+            <path d="M28,64 Q24,74 30,82"/>
+            <path d="M132,64 Q136,74 130,82"/>
           </g>`;
       } else if (dna.hairStyle === 'bun') {
         backHair = `
-          <circle cx="80" cy="28" r="18" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>
-          <path d="M38,76 C36,42 124,42 122,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+          <circle cx="80" cy="25" r="19" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M68,20 Q80,13 92,20" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+          <path d="M38,76 C36,40 124,40 122,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>`;
       } else if (dna.hairStyle === 'shaggy') {
-        backHair = `<path d="M34,74 C26,98 30,126 42,134 L118,134 C130,126 134,98 126,74 C120,36 40,36 34,74 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        backHair = `
+          <path d="M32,74 C24,96 28,124 40,134 L48,126 L56,136 L104,136 L112,126 L120,134 C132,124 136,96 128,74 C120,34 40,34 32,74 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/>`;
+      } else if (dna.hairStyle === 'braids') {
+        backHair = `
+          <path d="M36,76 C34,38 126,38 124,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <g fill="${hairHex}" stroke="${stroke}" stroke-width="1.8">
+            <ellipse cx="38" cy="114" rx="7" ry="9"/><ellipse cx="37" cy="128" rx="6.5" ry="9"/><ellipse cx="36" cy="142" rx="6" ry="9"/><ellipse cx="35" cy="156" rx="5.2" ry="8"/>
+            <ellipse cx="122" cy="114" rx="7" ry="9"/><ellipse cx="123" cy="128" rx="6.5" ry="9"/><ellipse cx="124" cy="142" rx="6" ry="9"/><ellipse cx="125" cy="156" rx="5.2" ry="8"/>
+          </g>
+          <path d="M31,161 L39,161 M121,161 L129,161" stroke="${hairHi}" stroke-width="2.2" stroke-linecap="round"/>`;
       }
 
-      // --- Face Shape ---
+      // --- Face Shape (5 clearly distinct silhouettes) ---
       let facePath = '';
+      let chinY = 144;
+      let earXLeft = 41, earXRight = 119;
       if (dna.faceShape === 'oval') {
-        facePath = 'M42,84 C42,50 118,50 118,84 C118,122 102,144 80,144 C58,144 42,122 42,84 Z';
+        facePath = 'M42,84 C42,49 118,49 118,84 C118,121 101,144 80,144 C59,144 42,121 42,84 Z';
       } else if (dna.faceShape === 'round') {
-        facePath = 'M38,90 C38,52 122,52 122,90 C122,126 106,143 80,143 C54,143 38,126 38,90 Z';
+        facePath = 'M36,91 C36,52 124,52 124,91 C124,127 107,142 80,142 C53,142 36,127 36,91 Z';
+        chinY = 142; earXLeft = 36; earXRight = 124;
       } else if (dna.faceShape === 'square') {
-        facePath = 'M42,84 C42,52 118,52 118,84 L117,118 C117,134 103,143 80,143 C57,143 43,134 43,118 Z';
-      } else { // heart
-        facePath = 'M40,80 C40,50 120,50 120,80 C120,108 98,140 80,145 C62,140 40,108 40,80 Z';
+        facePath = 'M41,82 C41,50 119,50 119,82 L118,122 C118,136 105,143 80,143 C55,143 42,136 42,122 Z';
+        chinY = 143;
+      } else if (dna.faceShape === 'heart') {
+        facePath = 'M38,79 C38,49 122,49 122,79 C122,107 96,138 80,146 C64,138 38,107 38,79 Z';
+        chinY = 146; earXLeft = 39; earXRight = 121;
+      } else { // long
+        facePath = 'M46,84 C46,48 114,48 114,84 C114,124 100,150 80,150 C60,150 46,124 46,84 Z';
+        chinY = 150; earXLeft = 45; earXRight = 115;
       }
 
-      // --- Eyes ---
-      let eyesSvg = '';
+      // --- Eyes (5 distinct shapes with eyelids, iris ring, dual specular) ---
       const renderEye = (cx, isRight) => {
         const dir = isRight ? 1 : -1;
         if (dna.eyeShape === 'almond') {
           return `
-            <path d="M${cx - 10},89 Q${cx},81 ${cx + 10},89 Q${cx},95 ${cx - 10},89 Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
-            <circle cx="${cx}" cy="89" r="4.1" fill="${eyeHex}"/>
-            <circle cx="${cx}" cy="89" r="2" fill="#111"/>
-            <circle cx="${cx + 1.5}" cy="87.5" r="1.1" fill="#FFF"/>
-          `;
+            <path d="M${cx - 10.5},89 Q${cx},81.5 ${cx + 10.5},89 Q${cx},94.5 ${cx - 10.5},89 Z" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="89" r="4.1" fill="${eyeHex}" stroke="${eyeRing}" stroke-width="0.9"/>
+            <circle cx="${cx}" cy="89" r="2.0" fill="#141110"/>
+            <circle cx="${cx + 1.4}" cy="87.4" r="1.1" fill="#FFF"/>
+            <circle cx="${cx - 1.3}" cy="90.3" r="0.55" fill="#FFF" opacity="0.7"/>
+            <path d="M${cx - 10.5},88.6 Q${cx},81 ${cx + 10.5},88.6" fill="none" stroke="${stroke}" stroke-width="2.1" stroke-linecap="round"/>
+            <path d="M${cx - 8.5},83.6 Q${cx},79.5 ${cx + 8.5},83.6" fill="none" stroke="${dna.skinShade}" stroke-width="1.2" stroke-linecap="round"/>`;
         } else if (dna.eyeShape === 'round') {
           return `
-            <circle cx="${cx}" cy="89" r="7.2" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
-            <circle cx="${cx}" cy="89" r="4.5" fill="${eyeHex}"/>
-            <circle cx="${cx}" cy="89" r="2.2" fill="#111"/>
-            <circle cx="${cx + 1.6}" cy="87.2" r="1.2" fill="#FFF"/>
-          `;
+            <circle cx="${cx}" cy="89" r="7.4" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="89" r="4.6" fill="${eyeHex}" stroke="${eyeRing}" stroke-width="1"/>
+            <circle cx="${cx}" cy="89" r="2.2" fill="#141110"/>
+            <circle cx="${cx + 1.6}" cy="87.1" r="1.3" fill="#FFF"/>
+            <circle cx="${cx - 1.5}" cy="90.6" r="0.6" fill="#FFF" opacity="0.7"/>
+            <path d="M${cx - 7.5},87.5 A7.6,7.6 0 0,1 ${cx + 7.5},87.5" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M${cx - 6.5},80.8 Q${cx},78 ${cx + 6.5},80.8" fill="none" stroke="${dna.skinShade}" stroke-width="1.2" stroke-linecap="round"/>`;
         } else if (dna.eyeShape === 'hooded') {
           return `
-            <path d="M${cx - 10},89 Q${cx},84 ${cx + 10},89 Q${cx},94 ${cx - 10},89 Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
-            <circle cx="${cx}" cy="89.5" r="3.6" fill="${eyeHex}"/>
-            <circle cx="${cx}" cy="89.5" r="1.8" fill="#111"/>
-            <path d="M${cx - 11},85.5 Q${cx},82 ${cx + 11},86" fill="none" stroke="${stroke}" stroke-width="1.7" stroke-linecap="round"/>
-          `;
-        } else { // upturned
+            <path d="M${cx - 10.5},90 Q${cx},85.5 ${cx + 10.5},90 Q${cx},94.2 ${cx - 10.5},90 Z" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="90.2" r="3.4" fill="${eyeHex}" stroke="${eyeRing}" stroke-width="0.9"/>
+            <circle cx="${cx}" cy="90.2" r="1.7" fill="#141110"/>
+            <circle cx="${cx + 1.1}" cy="89.1" r="0.9" fill="#FFF"/>
+            <path d="M${cx - 11},89.5 Q${cx},84.8 ${cx + 11},89.5" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M${cx - 11.5},85.8 Q${cx},82.5 ${cx + 11.5},86.2" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>`;
+        } else if (dna.eyeShape === 'upturned') {
           return `
-            <path d="M${cx - 10},${89 + dir * 1.5} Q${cx},81 ${cx + 10},${89 - dir * 1.5} Q${cx},95 ${cx - 10},${89 + dir * 1.5} Z" fill="#FFFFFF" stroke="${stroke}" stroke-width="1.8"/>
-            <circle cx="${cx}" cy="88.5" r="4" fill="${eyeHex}"/>
-            <circle cx="${cx}" cy="88.5" r="1.9" fill="#111"/>
-            <circle cx="${cx + 1.4}" cy="87" r="1.1" fill="#FFF"/>
-          `;
+            <path d="M${cx - 10.5},${90.5 + dir * 2.2} Q${cx},81.5 ${cx + 10.5},${87.5 - dir * 2.2} Q${cx},94.8 ${cx - 10.5},${90.5 + dir * 2.2} Z" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="88.8" r="4.0" fill="${eyeHex}" stroke="${eyeRing}" stroke-width="0.9"/>
+            <circle cx="${cx}" cy="88.8" r="1.9" fill="#141110"/>
+            <circle cx="${cx + 1.3}" cy="87.2" r="1.1" fill="#FFF"/>
+            <path d="M${cx - 10.5},${90.2 + dir * 2.2} Q${cx},81 ${cx + 11.5},${86.8 - dir * 2.5}" fill="none" stroke="${stroke}" stroke-width="2.3" stroke-linecap="round"/>`;
+        } else { // downturned
+          return `
+            <path d="M${cx - 10.5},${87.5 - dir * 2.0} Q${cx},82 ${cx + 10.5},${90.5 + dir * 2.0} Q${cx},95.2 ${cx - 10.5},${87.5 - dir * 2.0} Z" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5"/>
+            <circle cx="${cx}" cy="89.4" r="4.0" fill="${eyeHex}" stroke="${eyeRing}" stroke-width="0.9"/>
+            <circle cx="${cx}" cy="89.4" r="1.9" fill="#141110"/>
+            <circle cx="${cx + 1.3}" cy="87.8" r="1.1" fill="#FFF"/>
+            <path d="M${cx - 10.5},${87.3 - dir * 2.0} Q${cx},81.6 ${cx + 10.8},${90.4 + dir * 2.1}" fill="none" stroke="${stroke}" stroke-width="2.1" stroke-linecap="round"/>
+            <path d="M${cx - 8},${83 - dir * 1.4} Q${cx},80 ${cx + 8},${85 + dir * 1.4}" fill="none" stroke="${dna.skinShade}" stroke-width="1.2" stroke-linecap="round"/>`;
         }
       };
-      eyesSvg = renderEye(62, false) + renderEye(98, true);
+      const eyesSvg = renderEye(61, false) + renderEye(99, true);
 
-      // --- Eyebrows ---
+      // --- Eyebrows (5 high-contrast styles) ---
       let browsSvg = '';
       if (dna.eyebrows === 'thick') {
         browsSvg = `
-          <path d="M51,77 Q62,73 72,77" fill="none" stroke="${hairHex}" stroke-width="4.4" stroke-linecap="round"/>
-          <path d="M88,77 Q98,73 109,77" fill="none" stroke="${hairHex}" stroke-width="4.4" stroke-linecap="round"/>
-        `;
+          <path d="M49,76.5 Q61,72 72.5,76.5" fill="none" stroke="${hairHex}" stroke-width="5.0" stroke-linecap="round"/>
+          <path d="M87.5,76.5 Q99,72 111,76.5" fill="none" stroke="${hairHex}" stroke-width="5.0" stroke-linecap="round"/>`;
       } else if (dna.eyebrows === 'arched') {
         browsSvg = `
-          <path d="M51,79 Q61,70 72,77" fill="none" stroke="${hairHex}" stroke-width="2.4" stroke-linecap="round"/>
-          <path d="M88,77 Q99,70 109,79" fill="none" stroke="${hairHex}" stroke-width="2.4" stroke-linecap="round"/>
-        `;
+          <path d="M49,79.5 Q59,68.5 72,76.5" fill="none" stroke="${hairHex}" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M88,76.5 Q101,68.5 111,79.5" fill="none" stroke="${hairHex}" stroke-width="2.5" stroke-linecap="round"/>`;
       } else if (dna.eyebrows === 'straight') {
         browsSvg = `
-          <path d="M51,77 L72,77" fill="none" stroke="${hairHex}" stroke-width="3" stroke-linecap="round"/>
-          <path d="M88,77 L109,77" fill="none" stroke="${hairHex}" stroke-width="3" stroke-linecap="round"/>
-        `;
+          <path d="M49,76.5 L72.5,76.5" fill="none" stroke="${hairHex}" stroke-width="3.2" stroke-linecap="round"/>
+          <path d="M87.5,76.5 L111,76.5" fill="none" stroke="${hairHex}" stroke-width="3.2" stroke-linecap="round"/>`;
+      } else if (dna.eyebrows === 'angled') {
+        browsSvg = `
+          <path d="M49,78.5 L58,71.5 L72.5,76" fill="none" stroke="${hairHex}" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M87.5,76 L102,71.5 L111,78.5" fill="none" stroke="${hairHex}" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>`;
       } else { // soft
         browsSvg = `
-          <path d="M52,78 Q62,74 71,77" fill="none" stroke="${hairHex}" stroke-width="2" stroke-linecap="round"/>
-          <path d="M89,77 Q98,74 108,78" fill="none" stroke="${hairHex}" stroke-width="2" stroke-linecap="round"/>
-        `;
+          <path d="M51,77.5 Q61,74 71,77" fill="none" stroke="${hairHex}" stroke-width="1.9" stroke-linecap="round"/>
+          <path d="M89,77 Q99,74 109,77.5" fill="none" stroke="${hairHex}" stroke-width="1.9" stroke-linecap="round"/>`;
       }
 
-      // --- Nose ---
+      // --- Nose (5 styles with subtle shading + clear silhouette) ---
       let noseSvg = '';
       if (dna.nose === 'button') {
-        noseSvg = `<path d="M76,105 Q80,109 84,105" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+        noseSvg = `
+          <ellipse cx="80" cy="107.2" rx="4.8" ry="2.2" fill="${dna.skinShade}" opacity="0.55"/>
+          <path d="M75.5,104.5 Q80,108.8 84.5,104.5" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round"/>`;
       } else if (dna.nose === 'straight') {
-        noseSvg = `<path d="M80,91 L80,106 Q77,108 75,106" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        noseSvg = `
+          <path d="M80.5,89 L82.5,105.5 Q79,108.5 75.5,106.5 L78.5,105 Z" fill="${dna.skinShade}" opacity="0.45"/>
+          <path d="M80,89 L80,106.2 Q77,108.5 74.5,106.2" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>`;
       } else if (dna.nose === 'wide') {
         noseSvg = `
-          <path d="M72,105 Q76,109 80,108 Q84,109 88,105" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="75" cy="105.5" r="1.2" fill="${stroke}"/>
-          <circle cx="85" cy="105.5" r="1.2" fill="${stroke}"/>
-        `;
-      } else { // aquiline
-        noseSvg = `<path d="M79,89 Q84,99 81,107 Q77,109 75,106" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+          <path d="M71,105.5 Q80,111.5 89,105.5 Q84,103 80,104 Q76,103 71,105.5 Z" fill="${dna.skinShade}" opacity="0.48"/>
+          <path d="M71,104.5 Q75.5,109.5 80,108.2 Q84.5,109.5 89,104.5" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round"/>
+          <circle cx="74.8" cy="105.5" r="1.35" fill="${stroke}"/>
+          <circle cx="85.2" cy="105.5" r="1.35" fill="${stroke}"/>`;
+      } else if (dna.nose === 'aquiline') {
+        noseSvg = `
+          <path d="M79,87.5 Q86,98.5 82.5,107.5 Q78,110 74.5,106.8 L79,104.5 Z" fill="${dna.skinShade}" opacity="0.45"/>
+          <path d="M78.5,87.5 Q85.5,98 81.5,107.5 Q77.5,110 74.5,106.5" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round"/>`;
+      } else { // upturned
+        noseSvg = `
+          <path d="M75,105.5 Q80,101.5 85,105.5 Q80,109.5 75,105.5 Z" fill="${dna.skinShade}" opacity="0.42"/>
+          <path d="M79,91 Q77.5,99 83,103.5 Q80,107.5 75.5,105" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
 
-      // --- Mouth ---
+      // --- Mouth (5 expressive styles with natural lip tone) ---
       let mouthSvg = '';
       if (dna.mouth === 'smile') {
-        mouthSvg = `<path d="M67,120 Q80,130 93,120" fill="none" stroke="${stroke}" stroke-width="2.3" stroke-linecap="round"/>`;
+        mouthSvg = `
+          <path d="M66.5,119.5 Q80,130.5 93.5,119.5 Q80,126.5 66.5,119.5 Z" fill="#FCFBF9" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M66,119.5 Q80,131 94,119.5" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>
+          <path d="M73,128.5 Q80,131.5 87,128.5" fill="none" stroke="${dna.skinShade}" stroke-width="1.5" stroke-linecap="round"/>`;
       } else if (dna.mouth === 'full') {
         mouthSvg = `
-          <path d="M68,121 Q74,117 80,119 Q86,117 92,121 Q80,130 68,121 Z" fill="#C97676" stroke="${stroke}" stroke-width="1.8" stroke-linejoin="round"/>
-          <path d="M70,121 Q80,123 90,121" fill="none" stroke="${stroke}" stroke-width="1.2"/>
-        `;
+          <path d="M67.5,121 Q74,116.2 80,118.6 Q86,116.2 92.5,121 Q80,131.2 67.5,121 Z" fill="${skinLip}" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M69,121 Q80,123.4 91,121" fill="none" stroke="${stroke}" stroke-width="1.2"/>
+          <path d="M75.5,125.4 Q80,126.8 84.5,125.4" fill="none" stroke="#FFF" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.mouth === 'thin') {
-        mouthSvg = `<path d="M69,122 Q80,124 91,122" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`;
+        mouthSvg = `
+          <path d="M69,122 Q80,123.5 91,122 Q80,125 69,122 Z" fill="${skinLip}" opacity="0.75"/>
+          <path d="M68.5,122 Q80,123.6 91.5,122" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round"/>`;
+      } else if (dna.mouth === 'wide') {
+        mouthSvg = `
+          <path d="M63,120.5 Q71,118.5 80,120 Q89,118.5 97,120.5 Q80,128.5 63,120.5 Z" fill="${skinLip}" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M64.5,120.8 Q80,124.2 95.5,120.8" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round"/>`;
       } else { // serene
-        mouthSvg = `<path d="M71,121 Q80,126 89,121" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round"/>`;
+        mouthSvg = `
+          <path d="M70.5,121 Q75.5,118.8 80,120.2 Q84.5,118.8 89.5,121 Q80,126.5 70.5,121 Z" fill="${skinLip}" opacity="0.82"/>
+          <path d="M70.5,121 Q80,125.8 89.5,121" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round"/>`;
       }
 
       // --- Special Genetic Marks ---
       let markSvg = '';
       if (dna.mark === 'freckles') {
         markSvg = `
-          <g fill="#7A482B" opacity="0.65">
-            <circle cx="54" cy="101" r="1.3"/><circle cx="60" cy="103" r="1.2"/><circle cx="57" cy="106" r="1.2"/><circle cx="65" cy="101" r="1.1"/>
-            <circle cx="106" cy="101" r="1.3"/><circle cx="100" cy="103" r="1.2"/><circle cx="103" cy="106" r="1.2"/><circle cx="95" cy="101" r="1.1"/>
+          <g fill="#7A482B" opacity="0.68">
+            <circle cx="53" cy="100" r="1.35"/><circle cx="59" cy="102.5" r="1.2"/><circle cx="56" cy="105.5" r="1.25"/><circle cx="64.5" cy="100.5" r="1.1"/>
+            <circle cx="76" cy="99.5" r="1.0"/><circle cx="84" cy="99.5" r="1.0"/>
+            <circle cx="107" cy="100" r="1.35"/><circle cx="101" cy="102.5" r="1.2"/><circle cx="104" cy="105.5" r="1.25"/><circle cx="95.5" cy="100.5" r="1.1"/>
           </g>`;
       } else if (dna.mark === 'beautyMark') {
-        markSvg = `<circle cx="101" cy="109" r="2.2" fill="#2B1E1A"/>`;
+        markSvg = `<circle cx="102" cy="108.5" r="2.3" fill="#261A16"/>`;
+      } else if (dna.mark === 'moleLip') {
+        markSvg = `<circle cx="90.5" cy="115.2" r="2.0" fill="#261A16"/>`;
       } else if (dna.mark === 'dimples') {
         markSvg = `
-          <path d="M62,118 Q60,122 63,125" fill="none" stroke="${dna.skinShade}" stroke-width="2" stroke-linecap="round"/>
-          <path d="M98,118 Q100,122 97,125" fill="none" stroke="${dna.skinShade}" stroke-width="2" stroke-linecap="round"/>`;
+          <path d="M60.5,117 Q58,121.5 61.5,125.5" fill="none" stroke="${dna.skinShade}" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M99.5,117 Q102,121.5 98.5,125.5" fill="none" stroke="${dna.skinShade}" stroke-width="2.2" stroke-linecap="round"/>`;
       } else if (dna.mark === 'cleftChin') {
-        markSvg = `<path d="M80,134 L80,140" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" opacity="0.65"/>`;
+        markSvg = `<path d="M80,${chinY - 10} L80,${chinY - 3.5}" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linecap="round" opacity="0.65"/>`;
       } else if (dna.mark === 'rosyCheeks') {
         markSvg = `
-          <ellipse cx="55" cy="105" rx="8" ry="4.5" fill="#E07A7A" opacity="0.38"/>
-          <ellipse cx="105" cy="105" rx="8" ry="4.5" fill="#E07A7A" opacity="0.38"/>`;
+          <ellipse cx="53" cy="105" rx="9" ry="5" fill="${skinBlush}" opacity="0.48"/>
+          <ellipse cx="107" cy="105" rx="9" ry="5" fill="${skinBlush}" opacity="0.48"/>`;
       }
 
-      // --- Front Hair Layer ---
+      // --- Front Hair Layer (10 distinct hairstyles with highlights) ---
       let frontHair = '';
       if (dna.hairStyle === 'shortCrop') {
-        frontHair = `<path d="M40,78 C38,44 122,44 120,78 C112,62 96,56 80,58 C64,56 48,62 40,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        frontHair = `
+          <path d="M40,78 C38,42 122,42 120,78 C112,62 96,55 80,58 C64,55 48,62 40,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M58,50 Q80,44 102,50" fill="none" stroke="${hairHi}" stroke-width="2.2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.hairStyle === 'buzz') {
-        frontHair = `<path d="M43,72 C44,48 116,48 117,72 C108,60 52,60 43,72 Z" fill="${hairHex}" opacity="0.88"/>`;
+        frontHair = `
+          <path d="M43,72 C44,48 116,48 117,72 C108,60 52,60 43,72 Z" fill="${hairHex}" opacity="0.9"/>
+          <path d="M56,56 Q80,51 104,56" fill="none" stroke="${hairHi}" stroke-width="1.8" stroke-linecap="round" opacity="0.35"/>`;
       } else if (dna.hairStyle === 'sidePart') {
-        frontHair = `<path d="M39,80 C38,42 122,42 121,80 C114,62 100,58 64,54 C52,62 44,68 39,80 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        frontHair = `
+          <path d="M39,80 C38,40 122,40 121,80 C114,62 100,58 63,53 C52,62 44,68 39,80 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M62,48 Q86,44 108,55" fill="none" stroke="${hairHi}" stroke-width="2.2" stroke-linecap="round" opacity="0.48"/>`;
       } else if (dna.hairStyle === 'bob') {
-        frontHair = `<path d="M38,76 C40,42 120,42 122,76 C112,64 102,58 80,62 C58,58 48,64 38,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        frontHair = `
+          <path d="M37,77 C39,40 121,40 123,77 C112,64 101,57 80,62 C59,57 48,64 37,77 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M54,51 Q80,45 106,51" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.hairStyle === 'longWavy') {
-        frontHair = `<path d="M38,78 C40,42 120,42 122,78 C110,58 92,54 80,64 C68,54 50,58 38,78 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2"/>`;
+        frontHair = `
+          <path d="M37,79 C39,40 121,40 123,79 C110,58 92,54 80,64 C68,54 50,58 37,79 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M52,52 Q70,46 80,55 Q90,46 108,52" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.hairStyle === 'curlyAfro') {
         frontHair = `
           <g fill="${hairHex}">
@@ -780,24 +1056,61 @@
             <circle cx="72" cy="50" r="13"/>
             <circle cx="90" cy="50" r="13"/>
             <circle cx="105" cy="55" r="11"/>
-          </g>`;
+          </g>
+          <path d="M66,46 Q74,42 82,46 M86,46 Q94,42 100,48" fill="none" stroke="${hairHi}" stroke-width="1.8" stroke-linecap="round" opacity="0.4"/>`;
       } else if (dna.hairStyle === 'bun') {
-        frontHair = `<path d="M41,76 C44,48 116,48 119,76 C108,60 52,60 41,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>`;
+        frontHair = `
+          <path d="M40,76 C43,46 117,46 120,76 C108,59 52,59 40,76 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M58,52 Q80,47 102,52" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`;
       } else if (dna.hairStyle === 'shaggy') {
-        frontHair = `<path d="M37,80 C38,42 122,42 123,80 L110,64 L98,72 L86,60 L72,71 L58,61 L48,72 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"/>`;
+        frontHair = `
+          <path d="M36,80 C38,40 122,40 124,80 L110,63 L98,73 L86,59 L72,72 L58,60 L48,73 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M56,49 Q80,43 104,49" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.42"/>`;
+      } else if (dna.hairStyle === 'braids') {
+        frontHair = `
+          <path d="M38,77 C40,42 120,42 122,77 C110,60 92,55 80,62 C68,55 50,60 38,77 Z" fill="${hairHex}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M80,44 L80,61" stroke="${dna.skinBase}" stroke-width="1.3" opacity="0.65"/>`;
+      } else if (dna.hairStyle === 'curlyShort') {
+        frontHair = `
+          <g fill="${hairHex}" stroke="${stroke}" stroke-width="1.8">
+            <circle cx="48" cy="60" r="11"/>
+            <circle cx="62" cy="49" r="13"/>
+            <circle cx="80" cy="45" r="14"/>
+            <circle cx="98" cy="49" r="13"/>
+            <circle cx="112" cy="60" r="11"/>
+          </g>
+          <g fill="${hairHex}">
+            <circle cx="56" cy="58" r="10"/><circle cx="72" cy="54" r="11"/><circle cx="88" cy="54" r="11"/><circle cx="104" cy="58" r="10"/>
+          </g>
+          <path d="M68,42 Q80,36 92,42" fill="none" stroke="${hairHi}" stroke-width="2" stroke-linecap="round" opacity="0.45"/>`;
       }
 
       return `
         <svg viewBox="0 0 160 180" class="w-full h-full block select-none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="faceGrad-${uid}" cx="50%" cy="42%" r="60%">
+              <stop offset="0%" stop-color="${dna.skinBase}"/>
+              <stop offset="76%" stop-color="${dna.skinBase}"/>
+              <stop offset="100%" stop-color="${dna.skinShade}" stop-opacity="0.92"/>
+            </radialGradient>
+          </defs>
           ${backHair}
-          <!-- Neck & Shoulders -->
-          <path d="M24,180 C26,156 50,150 66,148 L94,148 C110,150 134,156 136,180 Z" fill="${dna.shirtColor}" stroke="${stroke}" stroke-width="2.2"/>
-          <rect x="68" y="132" width="24" height="24" rx="8" fill="${dna.skinShade}" stroke="${stroke}" stroke-width="2"/>
+          <!-- Shoulders & Shirt -->
+          <path d="M22,180 C25,155 49,149 66,147 L94,147 C111,149 135,155 138,180 Z" fill="${dna.shirtColor}" stroke="${stroke}" stroke-width="2"/>
+          <path d="M64,148 Q80,160 96,148" fill="none" stroke="${stroke}" stroke-width="1.8" opacity="0.45"/>
+          <!-- Neck & Chin Shadow -->
+          <rect x="68" y="132" width="24" height="24" rx="8" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="1.9"/>
+          <path d="M68,136 Q80,149 92,136 L92,147 Q80,152 68,147 Z" fill="${dna.skinShade}" opacity="0.72"/>
           <!-- Ears -->
-          <ellipse cx="41" cy="95" rx="6" ry="10" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2"/>
-          <ellipse cx="119" cy="95" rx="6" ry="10" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2"/>
+          <ellipse cx="${earXLeft}" cy="95" rx="6" ry="10.5" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="1.9"/>
+          <path d="M${earXLeft - 1.5},91 Q${earXLeft - 3.5},95 ${earXLeft - 1},99" fill="none" stroke="${dna.skinShade}" stroke-width="1.6" stroke-linecap="round"/>
+          <ellipse cx="${earXRight}" cy="95" rx="6" ry="10.5" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="1.9"/>
+          <path d="M${earXRight + 1.5},91 Q${earXRight + 3.5},95 ${earXRight + 1},99" fill="none" stroke="${dna.skinShade}" stroke-width="1.6" stroke-linecap="round"/>
           <!-- Head -->
-          <path d="${facePath}" fill="${dna.skinBase}" stroke="${stroke}" stroke-width="2.2"/>
+          <path d="${facePath}" fill="url(#faceGrad-${uid})" stroke="${stroke}" stroke-width="2"/>
+          <!-- Subtle natural cheek warmth -->
+          <ellipse cx="53" cy="105" rx="7.5" ry="4" fill="${skinBlush}" opacity="0.16"/>
+          <ellipse cx="107" cy="105" rx="7.5" ry="4" fill="${skinBlush}" opacity="0.16"/>
           ${markSvg}
           ${eyesSvg}
           ${browsSvg}
@@ -812,30 +1125,106 @@
     // 5. GAME STATE & PERSISTENCE
     // =========================================================================
     const STORAGE_KEY = 'master_face_v1';
+    const DAILY_PROGRESS_KEY = 'master_face_daily_progress_v1';
+    const DAILY_SEED_VERSION = 2;
+
+    const DEFAULT_STATS = {
+      roundsPlayed: 0,
+      roundsWon: 0,
+      dailyStreak: 0,
+      lastDailyDate: null,
+      lastDailyResult: null,
+      bestEndlessStreak: 0
+    };
+
+    let storageWarningDismissed = false;
+
+    function showStorageWarning() {
+      if (storageWarningDismissed) return;
+      const el = document.getElementById('storage-warning');
+      if (el) el.classList.remove('hidden');
+    }
 
     function loadStats() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-      } catch (e) {}
-      return {
-        roundsPlayed: 0,
-        roundsWon: 0,
-        dailyStreak: 0,
-        lastDailyDate: null,
-        lastDailyResult: null,
-        bestEndlessStreak: 0
-      };
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            return { ...DEFAULT_STATS, ...parsed };
+          }
+        }
+      } catch (e) {
+        showStorageWarning();
+      }
+      return { ...DEFAULT_STATS };
     }
 
-    function saveStats(stats) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stats)); } catch (e) {}
+    function saveStats(nextStats) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStats));
+        return true;
+      } catch (e) {
+        showStorageWarning();
+        return false;
+      }
+    }
+
+    function loadDailyProgress(today) {
+      try {
+        const raw = localStorage.getItem(DAILY_PROGRESS_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.date !== today || parsed.seedVersion !== DAILY_SEED_VERSION) {
+          localStorage.removeItem(DAILY_PROGRESS_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveDailyProgress() {
+      if (game.mode !== 'daily' || !game.dailyDate) return;
+      const payload = {
+        date: game.dailyDate,
+        seedVersion: DAILY_SEED_VERSION,
+        roundIdx: game.roundIdx,
+        lives: game.lives,
+        lockedParents: [...game.lockedParents],
+        eliminated: [...game.eliminated],
+        hintUsed: game.hintUsed,
+        roundOver: game.roundOver,
+        lastRoundWon: game.lastRoundWon,
+        dailyResults: game.dailyResults.slice(),
+        dailyPoints: game.dailyPoints
+      };
+      try {
+        localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(payload));
+      } catch (e) {
+        showStorageWarning();
+      }
+    }
+
+    function clearDailyProgress() {
+      try {
+        localStorage.removeItem(DAILY_PROGRESS_KEY);
+      } catch (e) {}
+    }
+
+    function getActiveDailyStreak(s) {
+      if (!s.lastDailyDate || !s.dailyStreak) return 0;
+      const diff = daysBetweenKeys(s.lastDailyDate, getTodayKey());
+      return (diff === 0 || diff === 1) ? s.dailyStreak : 0;
     }
 
     let stats = loadStats();
+    let activeSummary = null;
 
     let game = {
       mode: 'daily', // 'daily' | 'endless'
+      dailyDate: null,
       endlessDiff: 'medium',
       endlessStreak: 0,
       rounds: [],
@@ -846,6 +1235,7 @@
       eliminated: new Set(),
       hintUsed: false,
       roundOver: false,
+      lastRoundWon: false,
       dailyResults: [], // array of 'perfect' | 'won' | 'lost'
       dailyPoints: 0
     };
@@ -886,15 +1276,21 @@
 
     function updateMenuMeta() {
       const today = getTodayKey();
-      const dayNum = getDayNumber();
+      const dayNum = getDayNumber(today);
+      const activeStreak = getActiveDailyStreak(stats);
       document.getElementById('menu-date-label').textContent = `Edición #${dayNum} · ${today}`;
-      document.getElementById('menu-streak-label').textContent = `Racha diaria: ${stats.dailyStreak} ${stats.dailyStreak === 1 ? 'día' : 'días'}`;
+      document.getElementById('menu-streak-label').textContent = `Racha diaria: ${activeStreak} ${activeStreak === 1 ? 'día' : 'días'}`;
 
       const badge = document.getElementById('daily-badge');
       if (stats.lastDailyDate === today && stats.lastDailyResult) {
-        badge.textContent = `Completado (${stats.lastDailyResult.won}/5)`;
+        badge.textContent = `Completado (${stats.lastDailyResult.won}/5) · Ver resumen`;
       } else {
-        badge.textContent = '5 rondas';
+        const saved = loadDailyProgress(today);
+        if (saved && (saved.roundIdx > 0 || saved.lives < 3 || saved.hintUsed || saved.roundOver || saved.eliminated.length > 0 || saved.lockedParents.length > 0)) {
+          badge.textContent = `Continuar (${Math.min(saved.roundIdx + 1, 5)}/5)`;
+        } else {
+          badge.textContent = '5 rondas';
+        }
       }
     }
 
@@ -903,33 +1299,72 @@
     // =========================================================================
     function startDailyGame() {
       const today = getTodayKey();
+
+      // If today's challenge is already completed, show the saved summary instead of replaying
+      if (stats.lastDailyDate === today && stats.lastDailyResult) {
+        renderDailySummary(stats.lastDailyResult, today);
+        showView('summary');
+        return;
+      }
+
       const rng = mulberry32(hashString('MASTER_FACE-' + today));
-      const schedule = ['easy', 'easy', 'medium', 'medium', 'hard'];
+      const schedule = ['easy', 'medium', 'medium', 'hard', 'hard'];
       const rounds = schedule.map(diff => generateRound(diff, rng));
 
-      game = {
-        mode: 'daily',
-        endlessDiff: 'medium',
-        endlessStreak: 0,
-        rounds,
-        roundIdx: 0,
-        lives: 3,
-        selected: new Set(),
-        lockedParents: new Set(),
-        eliminated: new Set(),
-        hintUsed: false,
-        roundOver: false,
-        dailyResults: [],
-        dailyPoints: 0
-      };
+      const saved = loadDailyProgress(today);
+      if (saved && saved.roundIdx >= 0 && saved.roundIdx < rounds.length) {
+        const roundCandCount = rounds[saved.roundIdx].candidates.length;
+        const validIndex = i => Number.isInteger(i) && i >= 0 && i < roundCandCount;
+
+        game = {
+          mode: 'daily',
+          dailyDate: today,
+          endlessDiff: 'medium',
+          endlessStreak: 0,
+          rounds,
+          roundIdx: saved.roundIdx,
+          lives: typeof saved.lives === 'number' ? saved.lives : 3,
+          selected: new Set(),
+          lockedParents: new Set((saved.lockedParents || []).filter(validIndex)),
+          eliminated: new Set((saved.eliminated || []).filter(validIndex)),
+          hintUsed: Boolean(saved.hintUsed),
+          roundOver: Boolean(saved.roundOver),
+          lastRoundWon: Boolean(saved.lastRoundWon),
+          dailyResults: Array.isArray(saved.dailyResults) ? saved.dailyResults.slice() : [],
+          dailyPoints: typeof saved.dailyPoints === 'number' ? saved.dailyPoints : 0
+        };
+      } else {
+        game = {
+          mode: 'daily',
+          dailyDate: today,
+          endlessDiff: 'medium',
+          endlessStreak: 0,
+          rounds,
+          roundIdx: 0,
+          lives: 3,
+          selected: new Set(),
+          lockedParents: new Set(),
+          eliminated: new Set(),
+          hintUsed: false,
+          roundOver: false,
+          lastRoundWon: false,
+          dailyResults: [],
+          dailyPoints: 0
+        };
+        saveDailyProgress();
+      }
 
       showView('game');
       renderCurrentRound();
+      if (game.roundOver) {
+        renderRevealPanel(game.lastRoundWon);
+      }
     }
 
     function startEndlessGame(diff) {
       game = {
         mode: 'endless',
+        dailyDate: null,
         endlessDiff: diff,
         endlessStreak: 0,
         rounds: [generateRound(diff, Math.random)],
@@ -940,6 +1375,7 @@
         eliminated: new Set(),
         hintUsed: false,
         roundOver: false,
+        lastRoundWon: false,
         dailyResults: [],
         dailyPoints: 0
       };
@@ -1129,6 +1565,8 @@
         setBanner(`<strong>0 de 2.</strong> Ninguno de los dos es progenitor. Te quedan ${game.lives} ${game.lives === 1 ? 'intento' : 'intentos'}.`, 'error');
       }
 
+      saveDailyProgress();
+
       const grid = document.getElementById('candidates-grid');
       grid.classList.add('animate-shake');
       setTimeout(() => grid.classList.remove('animate-shake'), 340);
@@ -1146,7 +1584,10 @@
         .map(c => c.index);
 
       if (availableDecoys.length === 0) return;
-      const toRemove = availableDecoys[Math.floor(Math.random() * availableDecoys.length)];
+      const hintRng = game.mode === 'daily'
+        ? mulberry32(hashString(`HINT-${game.dailyDate}-${game.roundIdx}`))
+        : Math.random;
+      const toRemove = availableDecoys[Math.floor(hintRng() * availableDecoys.length)];
       game.eliminated.add(toRemove);
       game.selected.delete(toRemove);
       game.hintUsed = true;
@@ -1155,38 +1596,16 @@
       document.getElementById('btn-hint').textContent = 'Pista usada';
       setBanner(`<strong>Pista:</strong> Hemos descartado a ${round.candidates[toRemove].name}.`, 'neutral');
 
+      saveDailyProgress();
       renderCandidatesGrid();
       updateActionBar();
     }
 
-    function finishRound(won) {
+    function renderRevealPanel(won) {
       const round = getCurrentRound();
-      game.roundOver = true;
-
-      stats.roundsPlayed += 1;
-      if (won) stats.roundsWon += 1;
-
-      if (game.mode === 'daily') {
-        const resultType = !won ? 'lost' : (game.lives === 3 && !game.hintUsed ? 'perfect' : 'won');
-        game.dailyResults.push(resultType);
-        if (won) game.dailyPoints += (game.lives * 100) - (game.hintUsed ? 30 : 0);
-      } else {
-        if (won) {
-          game.endlessStreak += 1;
-          if (game.endlessStreak > stats.bestEndlessStreak) {
-            stats.bestEndlessStreak = game.endlessStreak;
-          }
-        } else {
-          game.endlessStreak = 0;
-        }
-      }
-      saveStats(stats);
-
       document.getElementById('action-bar').classList.add('hidden');
       document.getElementById('btn-hint').disabled = true;
-      renderCandidatesGrid();
 
-      // Show Reveal Panel
       const statusEl = document.getElementById('reveal-status');
       if (won) {
         statusEl.textContent = game.lives === 3 ? '¡Acertado a la primera!' : '¡Pareja encontrada!';
@@ -1200,7 +1619,7 @@
       const breakdownEl = document.getElementById('reveal-breakdown');
       breakdownEl.innerHTML = parents.map(p => `
         <div class="flex items-center gap-3 p-3 rounded-xl bg-[var(--background)] border border-[var(--border)]">
-          <div class="w-16 h-18 rounded-lg overflow-hidden border border-[var(--border)] shrink-0">
+          <div class="w-16 aspect-[8/9] rounded-lg overflow-hidden border border-[var(--border)] shrink-0">
             ${renderPortraitSVG(p.dna)}
           </div>
           <div class="space-y-1.5 min-w-0">
@@ -1222,11 +1641,40 @@
       document.getElementById('reveal-panel').classList.remove('hidden');
     }
 
+    function finishRound(won) {
+      game.roundOver = true;
+      game.lastRoundWon = won;
+
+      stats.roundsPlayed += 1;
+      if (won) stats.roundsWon += 1;
+
+      if (game.mode === 'daily') {
+        const resultType = !won ? 'lost' : (game.lives === 3 && !game.hintUsed ? 'perfect' : 'won');
+        game.dailyResults.push(resultType);
+        if (won) game.dailyPoints += (game.lives * 100) - (game.hintUsed ? 30 : 0);
+        saveDailyProgress();
+      } else {
+        if (won) {
+          game.endlessStreak += 1;
+          if (game.endlessStreak > stats.bestEndlessStreak) {
+            stats.bestEndlessStreak = game.endlessStreak;
+          }
+        } else {
+          game.endlessStreak = 0;
+        }
+      }
+      saveStats(stats);
+
+      renderCandidatesGrid();
+      renderRevealPanel(won);
+    }
+
     function nextRound() {
       if (game.mode === 'daily') {
         if (game.roundIdx < game.rounds.length - 1) {
           game.roundIdx += 1;
           resetRoundState();
+          saveDailyProgress();
           renderCurrentRound();
         } else {
           showDailySummary();
@@ -1246,29 +1694,52 @@
       game.eliminated.clear();
       game.hintUsed = false;
       game.roundOver = false;
+      game.lastRoundWon = false;
     }
 
-    function showDailySummary() {
-      const today = getTodayKey();
-      const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
+    function renderDailySummary(result, dateKey) {
+      const emojis = Array.isArray(result.emojis) ? result.emojis : [];
+      const wonCount = typeof result.won === 'number'
+        ? result.won
+        : emojis.filter(r => r !== 'lost').length;
+      const points = typeof result.points === 'number' ? result.points : 0;
 
-      if (stats.lastDailyDate !== today) {
-        stats.dailyStreak = wonCount > 0 ? stats.dailyStreak + 1 : 0;
-        stats.lastDailyDate = today;
-      }
-      stats.lastDailyResult = { won: wonCount, points: game.dailyPoints, emojis: game.dailyResults };
-      saveStats(stats);
+      activeSummary = { date: dateKey, won: wonCount, points, emojis };
 
-      const emojiStr = game.dailyResults.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join(' ');
+      const emojiStr = emojis.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join(' ');
       document.getElementById('summary-emojis').textContent = emojiStr;
       document.getElementById('sum-score').textContent = `${wonCount}/5`;
-      document.getElementById('sum-points').textContent = game.dailyPoints;
-      document.getElementById('sum-streak').textContent = stats.dailyStreak;
+      document.getElementById('sum-points').textContent = points;
+      document.getElementById('sum-streak').textContent = getActiveDailyStreak(stats);
       document.getElementById('summary-title').textContent =
         wonCount === 5 ? '¡Ojo clínico perfecto!' :
         wonCount >= 3 ? '¡Muy buen ojo!' : '¡Mañana será otro día!';
       document.getElementById('share-toast').classList.add('hidden');
+    }
 
+    function showDailySummary() {
+      const dateKey = game.dailyDate || getTodayKey();
+      const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
+
+      if (stats.lastDailyDate !== dateKey) {
+        const diff = daysBetweenKeys(stats.lastDailyDate, dateKey);
+        if (wonCount > 0) {
+          stats.dailyStreak = diff === 1 ? stats.dailyStreak + 1 : 1;
+        } else {
+          stats.dailyStreak = 0;
+        }
+        stats.lastDailyDate = dateKey;
+        stats.lastDailyResult = {
+          date: dateKey,
+          won: wonCount,
+          points: game.dailyPoints,
+          emojis: game.dailyResults.slice()
+        };
+      }
+      clearDailyProgress();
+      saveStats(stats);
+
+      renderDailySummary(stats.lastDailyResult, dateKey);
       updateMenuMeta();
       showView('summary');
     }
@@ -1276,6 +1747,11 @@
     // =========================================================================
     // 10. EVENT LISTENERS & MODALS
     // =========================================================================
+    document.getElementById('btn-dismiss-storage-warning').addEventListener('click', () => {
+      storageWarningDismissed = true;
+      document.getElementById('storage-warning').classList.add('hidden');
+    });
+
     document.getElementById('btn-home').addEventListener('click', () => {
       updateMenuMeta();
       showView('menu');
@@ -1303,10 +1779,15 @@
     });
 
     document.getElementById('btn-share').addEventListener('click', async () => {
-      const dayNum = getDayNumber();
-      const wonCount = game.dailyResults.filter(r => r !== 'lost').length;
-      const emojiStr = game.dailyResults.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join('');
-      const text = `Master Face #${dayNum} — ${wonCount}/5 (${game.dailyPoints} pts)\n${emojiStr}`;
+      const summary = activeSummary || {
+        date: game.dailyDate || getTodayKey(),
+        won: game.dailyResults.filter(r => r !== 'lost').length,
+        points: game.dailyPoints,
+        emojis: game.dailyResults
+      };
+      const dayNum = getDayNumber(summary.date);
+      const emojiStr = summary.emojis.map(r => r === 'perfect' ? '🟩' : r === 'won' ? '🟨' : '⬜').join('');
+      const text = `Master Face #${dayNum} — ${summary.won}/5 (${summary.points} pts)\n${emojiStr}`;
       try {
         await navigator.clipboard.writeText(text);
         document.getElementById('share-toast').classList.remove('hidden');
@@ -1335,7 +1816,7 @@
         const rate = stats.roundsPlayed ? Math.round((stats.roundsWon / stats.roundsPlayed) * 100) : 0;
         document.getElementById('st-played').textContent = stats.roundsPlayed;
         document.getElementById('st-winrate').textContent = `${rate}%`;
-        document.getElementById('st-streak').textContent = stats.dailyStreak;
+        document.getElementById('st-streak').textContent = getActiveDailyStreak(stats);
         document.getElementById('st-best').textContent = stats.bestEndlessStreak;
       }
     }
